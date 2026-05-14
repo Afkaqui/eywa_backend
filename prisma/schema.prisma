@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  superadmin
+  admin
+  gestor
+  user
+}
+
+enum UserPlan {
+  free
+  premium
+}
+
+enum CourseLevel {
+  basico
+  intermedio
+  avanzado
+}
+
+enum CourseCategory {
+  agrotech
+  edutech
+  banca_sostenible
+  esg
+  general
+}
+
+enum RiskLevel {
+  bajo
+  medio
+  alto
+}
+
+// ─── Profiles ─────────────────────────────────────────────────────────────────
+
+model Profile {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  fullName  String?  @map("full_name")
+  company   String?
+  password  String   // bcrypt hash
+  role      UserRole @default(user)
+  plan      UserPlan @default(free)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  portfolioCompanies  PortfolioCompany[]
+  diagnosticResults   DiagnosticResult[]
+  diagnosticQuestions DiagnosticQuestion[]
+  courses             Course[]
+  enrollments         CourseEnrollment[]
+
+  @@map("profiles")
+}
+
+// ─── Portfolio ────────────────────────────────────────────────────────────────
+
+model PortfolioCompany {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  sector    String
+  score     Int       @default(0)
+  status    String    @default("Pendiente")
+  carbon    String?
+  trend     String?
+  lastAudit String?   @map("last_audit")
+  risk      RiskLevel @default(medio)
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  creator Profile? @relation(fields: [createdBy], references: [id])
+
+  @@map("portfolio_companies")
+}
+
+// ─── Diagnostic ───────────────────────────────────────────────────────────────
+
+model DiagnosticQuestion {
+  id                 String   @id @default(uuid()) @db.Uuid
+  sortOrder          Int      @default(0) @map("sort_order")
+  title              String
+  description        String
+  contextTitle       String?  @map("context_title")
+  contextDescription String?  @map("context_description")
+  contextImpact      String?  @map("context_impact")
+  contextImage       String?  @map("context_image")
+  createdBy          String?  @map("created_by") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  options   DiagnosticOption[]
+  creator   Profile?           @relation(fields: [createdBy], references: [id])
+
+  @@map("diagnostic_questions")
+}
+
+model DiagnosticOption {
+  id         String @id @default(uuid()) @db.Uuid
+  questionId String @map("question_id") @db.Uuid
+  label      String
+  value      String
+  score      Int    @default(0)
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  question DiagnosticQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("diagnostic_options")
+}
+
+model DiagnosticResult {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  score      Int
+  maxScore   Int      @map("max_score")
+  percentage Int
+  level      String
+  breakdown  Json     @default("[]")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("diagnostic_results")
+}
+
+// ─── Courses ──────────────────────────────────────────────────────────────────
+
+model Course {
+  id           String         @id @default(uuid()) @db.Uuid
+  title        String
+  description  String
+  category     CourseCategory @default(general)
+  level        CourseLevel    @default(basico)
+  durationHours Int           @default(1) @map("duration_hours")
+  imageUrl     String?        @map("image_url")
+  instructor   String         @default("EYWA Academy")
+  lessonsCount Int            @default(1) @map("lessons_count")
+  isPublished  Boolean        @default(false) @map("is_published")
+  createdBy    String?        @map("created_by") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  creator     Profile?          @relation(fields: [createdBy], references: [id])
+  enrollments CourseEnrollment[]
+
+  @@map("courses")
+}
+
+model CourseEnrollment {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  courseId    String    @map("course_id") @db.Uuid
+  progress    Int       @default(0)
+  completed   Boolean   @default(false)
+  enrolledAt  DateTime  @default(now()) @map("enrolled_at")
+  completedAt DateTime? @map("completed_at")
+
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("course_enrollments")
+}

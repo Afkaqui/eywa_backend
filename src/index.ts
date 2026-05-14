@@ -1,0 +1,46 @@
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import { logger } from 'hono/logger';
+import { corsMiddleware } from '@/middleware/cors';
+import { authRouter } from '@/routes/auth';
+import { usersRouter } from '@/routes/users';
+import { portfolioRouter } from '@/routes/portfolio';
+import { diagnosticRouter } from '@/routes/diagnostic';
+import { coursesRouter } from '@/routes/courses';
+import { ApiError } from '@/lib/auth-helpers';
+
+const app = new Hono();
+
+// ── Middlewares globales ───────────────────────────────────────────────────────
+app.use('*', logger());
+app.use('*', corsMiddleware);
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get('/', (c) => c.json({ status: 'ok', service: 'EYWA API', version: '1.0.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// ── Rutas ─────────────────────────────────────────────────────────────────────
+app.route('/api/auth',       authRouter);
+app.route('/api/users',      usersRouter);
+app.route('/api/portfolio',  portfolioRouter);
+app.route('/api/diagnostic', diagnosticRouter);
+app.route('/api/courses',    coursesRouter);
+
+// ── Manejo global de errores ──────────────────────────────────────────────────
+app.onError((err, c) => {
+  if (err instanceof ApiError) {
+    return c.json({ error: err.message }, err.status as 400 | 401 | 403 | 404 | 500);
+  }
+  console.error('[Error]', err);
+  return c.json({ error: 'Error interno del servidor' }, 500);
+});
+
+app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
+
+// ── Servidor ──────────────────────────────────────────────────────────────────
+const port = Number(process.env.PORT ?? 4001);
+console.log(`🚀 EYWA API corriendo en http://localhost:${port}`);
+
+serve({ fetch: app.fetch, port });
+
+export default app;

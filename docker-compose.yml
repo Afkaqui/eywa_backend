@@ -1,0 +1,15 @@
+services:
+  eywa-api:
+    build: .
+    container_name: eywa_api
+    restart: always
+    ports:
+      - "4001:4001"
+    environment:
+      - NODE_ENV=production
+      - PORT=4001
+      - DATABASE_URL=${DATABASE_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
