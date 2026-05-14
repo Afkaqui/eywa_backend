@@ -112,3 +112,56 @@ authRouter.post('/login', async (c) => {
 
   return c.json({ token, user: { id: user.id, email: user.email, role: user.role, plan: user.plan } });
 });
+
+// ── POST /api/auth/oauth-sync ─────────────────────────────────────────────────
+// Llamado por Auth.js cuando un usuario se autentica con Google (o cualquier OAuth).
+// Crea la cuenta si no existe y devuelve el JWT del backend.
+const oauthSyncSchema = z.object({
+  email:    z.string().email(),
+  name:     z.string().nullish(),
+  provider: z.string(),
+});
+
+authRouter.post('/oauth-sync', async (c) => {
+  const body = await c.req.json();
+  const parsed = oauthSyncSchema.safeParse(body);
+
+  if (!parsed.success) throw new ApiError(400, 'Datos inválidos');
+
+  const { email, name } = parsed.data;
+
+  // Buscar o crear el perfil
+  let user = await db.profile.findUnique({ where: { email } });
+
+  if (!user) {
+    user = await db.profile.create({
+      data: {
+        email,
+        password: '', // OAuth users don't need a password
+        fullName:  name ?? null,
+        company:   null,
+        role:      'user',
+        plan:      'free',
+      },
+    });
+  }
+
+  const token = signToken({
+    sub:   user.id,
+    email: user.email,
+    role:  user.role,
+    plan:  user.plan,
+    name:  user.fullName ?? undefined,
+  });
+
+  return c.json({
+    token,
+    user: {
+      id:      user.id,
+      email:   user.email,
+      role:    user.role,
+      plan:    user.plan,
+      company: user.company,
+    },
+  });
+});
