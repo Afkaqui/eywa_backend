@@ -60,6 +60,11 @@ model Profile {
   diagnosticQuestions DiagnosticQuestion[]
   courses             Course[]
   enrollments         CourseEnrollment[]
+  organization        Organization?
+  simbiocreaciones    Simbiocreacion[]
+  esgScore            EsgScore?
+  esgHistory          EsgHistory[]
+
 
   @@map("profiles")
 }
@@ -175,4 +180,78 @@ model CourseEnrollment {
   @@index([userId])
   @@index([courseId])
   @@map("course_enrollments")
+}
+
+
+// ─── Organization ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  type            String   @default("empresa")
+  institutionType String?  @map("institution_type")
+  name            String
+  description     String?
+  phone           String?
+  website         String?
+  externalLinks   Json     @default("[]") @map("external_links")
+  country         String?
+  sector          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("organizations")
+}
+
+// ─── Simbiocreacion ───────────────────────────────────────────────────────────
+
+model Simbiocreacion {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  nombre      String
+  privado     Boolean  @default(false)
+  lugar       String?
+  fecha       String?
+  horaInicio  String?  @map("hora_inicio")
+  descripcion String?
+  link        String?
+  tags        Json     @default("[]")
+  extraUrls   Json     @default("[]") @map("extra_urls")
+  ods         Json     @default("[]")
+  graphData   Json?    @map("graph_data")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("simbiocreaciones")
+}
+
+// ─── ESG Score ────────────────────────────────────────────────────────────────
+
+model EsgScore {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  scores    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("esg_scores")
+}
+
+model EsgHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  scores    Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("esg_history")
 }

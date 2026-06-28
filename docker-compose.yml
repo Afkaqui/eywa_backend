@@ -11,5 +11,12 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN}
+    networks:
+      - postgresql_default
+      - default
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+networks:
+  postgresql_default:
+    external: true
