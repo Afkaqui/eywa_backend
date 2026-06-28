@@ -10,6 +10,7 @@ import { coursesRouter }        from '@/routes/courses';
 import { organizationRouter }   from '@/routes/organization';
 import { simbiocreacionRouter } from '@/routes/simbiocreacion';
 import esgRouter                  from '@/routes/esg';
+import { validatorRouter }        from '@/routes/validator';
 import { ApiError } from '@/lib/auth-helpers';
 
 const app = new Hono();
@@ -31,6 +32,7 @@ app.route('/api/courses',         coursesRouter);
 app.route('/api/organization',    organizationRouter);
 app.route('/api/simbiocreacion',  simbiocreacionRouter);
 app.route('/api/esg',             esgRouter);
+app.route('/api/validator',       validatorRouter);
 
 // Manejo global de errores
 app.onError((err, c) => {

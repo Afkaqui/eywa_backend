@@ -60,7 +60,6 @@ export class ProfileRepository {
     });
     return {};
   }
-}
 
   async search(q: string): Promise<Array<{id: string; fullName: string | null; company: string | null}>> {
     return this.db.profile.findMany({
@@ -75,3 +74,4 @@ export class ProfileRepository {
       select: { id: true, fullName: true, company: true },
     });
   }
+}

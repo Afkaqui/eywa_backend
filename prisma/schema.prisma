@@ -41,6 +41,13 @@ enum RiskLevel {
   alto
 }
 
+enum ValidationStatus {
+  pending
+  analyzing
+  analyzed
+  failed
+}
+
 // ─── Profiles ─────────────────────────────────────────────────────────────────
 
 model Profile {
@@ -64,6 +71,7 @@ model Profile {
   simbiocreaciones    Simbiocreacion[]
   esgScore            EsgScore?
   esgHistory          EsgHistory[]
+  projectPlans        ProjectPlan[]
 
 
   @@map("profiles")
@@ -254,4 +262,31 @@ model EsgHistory {
 
   @@index([userId])
   @@map("esg_history")
+}
+
+// ─── Validador de Proyectos IA ─────────────────────────────────────────────────
+
+model ProjectPlan {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @map("user_id") @db.Uuid
+  name         String
+  type         String
+  description  String
+  budget       Int              @default(0)
+  duration     Int              @default(0)
+  carbonGoal   Int              @default(0) @map("carbon_goal")
+  objectives   String?
+  stakeholders String?
+  documents    Json             @default("[]")
+  status       ValidationStatus @default(pending)
+  report       Json?
+  analyzedAt   DateTime?        @map("analyzed_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("project_plans")
 }
