@@ -1,0 +1,49 @@
+name: Deploy backend al VPS
+
+# Cada push a master despliega el backend en el VPS.
+# El frontend se despliega aparte (Vercel).
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:   # permite lanzarlo a mano desde la pestaña Actions
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd ~/eywa-backend
+
+            echo "== 1. Traer código =="
+            git fetch origin master
+            git reset --hard origin/master          # requiere migrations/ propiedad de kaqui (ver setup)
+
+            echo "== 2. Construir imagen (sin sudo) =="
+            docker compose build
+
+            echo "== 3. Recrear contenedor (workaround Docker-Snap/AppArmor) =="
+            # docker stop/recreate falla por AppArmor incluso con sudo -> matamos el PID directo.
+            docker update --restart=no eywa_api || true
+            PID=$(docker inspect --format '{{.State.Pid}}' eywa_api 2>/dev/null || echo "")
+            if [ -n "$PID" ] && [ "$PID" != "0" ]; then
+              sudo kill -9 "$PID" || true
+            fi
+            sudo docker rm eywa_api || true
+            sudo docker compose up -d
+
+            echo "== 4. Verificar =="
+            sleep 4
+            curl -sf http://localhost:4001/health && echo "  -> backend OK"
