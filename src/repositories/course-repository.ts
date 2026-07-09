@@ -35,9 +35,12 @@ export class CourseRepository {
     });
   }
 
+  // Idempotente: si ya existe la inscripción (p. ej. por auto-enroll), la devuelve
   async enroll(userId: string, courseId: string) {
-    return this.db.courseEnrollment.create({
-      data: { userId, courseId, progress: 0, completed: false },
+    return this.db.courseEnrollment.upsert({
+      where:  { userId_courseId: { userId, courseId } },
+      update: {},
+      create: { userId, courseId, progress: 0, completed: false },
     });
   }
 

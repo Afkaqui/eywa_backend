@@ -72,6 +72,9 @@ model Profile {
   esgScore            EsgScore?
   esgHistory          EsgHistory[]
   projectPlans        ProjectPlan[]
+  sectionProgress     SectionProgress[]
+  examAttempts        ExamAttempt[]
+  certificates        Certificate[]
 
 
   @@map("profiles")
@@ -162,14 +165,115 @@ model Course {
   instructor   String         @default("EYWA Academy")
   lessonsCount Int            @default(1) @map("lessons_count")
   isPublished  Boolean        @default(false) @map("is_published")
+  passThreshold Int           @default(80) @map("pass_threshold") // % mínimo para aprobar el examen
   createdBy    String?        @map("created_by") @db.Uuid
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  creator     Profile?          @relation(fields: [createdBy], references: [id])
-  enrollments CourseEnrollment[]
+  creator       Profile?          @relation(fields: [createdBy], references: [id])
+  enrollments   CourseEnrollment[]
+  sections      CourseSection[]
+  examQuestions ExamQuestion[]
+  examAttempts  ExamAttempt[]
+  certificates  Certificate[]
 
   @@map("courses")
+}
+
+// ─── Academia: secciones, examen y certificados ────────────────────────────────
+
+model CourseSection {
+  id          String   @id @default(uuid()) @db.Uuid
+  courseId    String   @map("course_id") @db.Uuid
+  sortOrder   Int      @default(0) @map("sort_order")
+  title       String
+  description String?
+  videoUrl    String?  @map("video_url") // URL de YouTube
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  course    Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  resources SectionResource[]
+  progress  SectionProgress[]
+
+  @@index([courseId])
+  @@map("course_sections")
+}
+
+model SectionResource {
+  id        String @id @default(uuid()) @db.Uuid
+  sectionId String @map("section_id") @db.Uuid
+  type      String @default("link") // pdf | link | forum
+  title     String
+  url       String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@map("section_resources")
+}
+
+model SectionProgress {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  sectionId   String   @map("section_id") @db.Uuid
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  user    Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectionId])
+  @@index([userId])
+  @@map("section_progress")
+}
+
+model ExamQuestion {
+  id           String @id @default(uuid()) @db.Uuid
+  courseId     String @map("course_id") @db.Uuid
+  sortOrder    Int    @default(0) @map("sort_order")
+  question     String
+  options      Json   @default("[]") // array de strings
+  correctIndex Int    @map("correct_index") // NUNCA se envía al cliente
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("exam_questions")
+}
+
+model ExamAttempt {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  courseId   String   @map("course_id") @db.Uuid
+  score      Int
+  total      Int
+  percentage Int
+  passed     Boolean  @default(false)
+  answers    Json     @default("{}") // { questionId: optionIndex }
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+  @@map("exam_attempts")
+}
+
+model Certificate {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  courseId   String   @map("course_id") @db.Uuid
+  code       String   @unique // código de verificación pública
+  percentage Int
+  issuedAt   DateTime @default(now()) @map("issued_at")
+
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@map("certificates")
 }
 
 model CourseEnrollment {
