@@ -36,14 +36,23 @@ jobs:
 
             echo "== 3. Recrear contenedor (workaround Docker-Snap/AppArmor) =="
             # docker stop/recreate falla por AppArmor incluso con sudo -> matamos el PID directo.
-            docker update --restart=no eywa_api || true
+            # OJO: quitar restart=always ANTES del kill (con sudo, y verificado) o el
+            # contenedor resucita solo con la imagen vieja.
+            sudo docker update --restart=no eywa_api
+            POLICY=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' eywa_api 2>/dev/null || echo "")
+            if [ "$POLICY" != "no" ] && [ -n "$POLICY" ]; then
+              echo "ERROR: no se pudo quitar la politica de reinicio (policy=$POLICY); aborto para evitar carrera"
+              exit 1
+            fi
             PID=$(docker inspect --format '{{.State.Pid}}' eywa_api 2>/dev/null || echo "")
             if [ -n "$PID" ] && [ "$PID" != "0" ]; then
               sudo kill -9 "$PID" || true
+              sleep 2
             fi
             sudo docker rm eywa_api || true
             sudo docker compose up -d
 
             echo "== 4. Verificar =="
-            sleep 4
+            sleep 5
+            docker ps --filter name=eywa_api --format "  contenedor: up {{.RunningFor}} ({{.Image}})"
             curl -sf http://localhost:4001/health && echo "  -> backend OK"
