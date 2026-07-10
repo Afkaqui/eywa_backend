@@ -110,7 +110,17 @@ authRouter.post('/login', async (c) => {
     name:  user.fullName ?? undefined,
   });
 
-  return c.json({ token, user: { id: user.id, email: user.email, role: user.role, plan: user.plan } });
+  return c.json({
+    token,
+    user: {
+      id:      user.id,
+      email:   user.email,
+      name:    user.fullName,   // Auth.js lo lee de aquí (no del JWT) -> nombre en perfil/certificado
+      role:    user.role,
+      plan:    user.plan,
+      company: user.company,
+    },
+  });
 });
 
 // ── POST /api/auth/oauth-sync ─────────────────────────────────────────────────
