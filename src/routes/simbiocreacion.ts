@@ -10,6 +10,19 @@ const simbiRepo = new SimbiocreacionRepository(db);
 
 simbiocreacionRouter.use('*', authMiddleware);
 
+// Grafo persistido (coincide con StoredGraph del frontend).
+// null = el usuario borró su grafo personalizado.
+const graphSchema = z.object({
+  nodes: z.array(z.object({
+    id:     z.string(),
+    label:  z.string(),
+    type:   z.enum(['center', 'category', 'group', 'person']),
+    color:  z.string(),
+    userId: z.string().optional(),
+  })),
+  edges: z.array(z.object({ from: z.string(), to: z.string() })),
+});
+
 const simbiSchema = z.object({
   nombre:      z.string().min(1),
   privado:     z.boolean().optional(),
@@ -21,6 +34,7 @@ const simbiSchema = z.object({
   tags:        z.array(z.string()).optional(),
   extraUrls:   z.array(z.string()).optional(),
   ods:         z.array(z.number()).optional(),
+  graphData:   graphSchema.nullable().optional(),
 });
 
 // GET /api/simbiocreacion
@@ -50,6 +64,7 @@ simbiocreacionRouter.patch('/:id', async (c) => {
   if (!parsed.success) throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos invalidos');
 
   const item = await simbiRepo.update(id, user.sub, parsed.data);
+  if (!item) throw new ApiError(404, 'Simbiocreación no encontrada');
   return c.json({ simbiocreacion: item });
 });
 
@@ -57,7 +72,8 @@ simbiocreacionRouter.patch('/:id', async (c) => {
 simbiocreacionRouter.delete('/:id', async (c) => {
   const user = getRequestUser(c);
   const { id } = c.req.param();
-  await simbiRepo.delete(id, user.sub);
+  const deleted = await simbiRepo.delete(id, user.sub);
+  if (!deleted) throw new ApiError(404, 'Simbiocreación no encontrada');
   return c.json({ success: true });
 });
 

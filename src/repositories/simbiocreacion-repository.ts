@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 type SimbiData = {
   nombre: string;
@@ -11,8 +11,16 @@ type SimbiData = {
   tags?: Prisma.InputJsonValue;
   extraUrls?: Prisma.InputJsonValue;
   ods?: Prisma.InputJsonValue;
-  graphData?: Prisma.InputJsonValue;
+  graphData?: Prisma.InputJsonValue | null;
 };
+
+// Prisma exige Prisma.DbNull (no `null`) para poner en NULL un campo Json?.
+// El frontend envía graphData: null al borrar el grafo personalizado.
+function normalizeGraphData<T extends Partial<SimbiData>>(data: T) {
+  if (!('graphData' in data)) return data;
+  const { graphData, ...rest } = data;
+  return { ...rest, graphData: graphData === null ? Prisma.DbNull : graphData };
+}
 
 export class SimbiocreacionRepository {
   constructor(private db: PrismaClient) {}
@@ -57,19 +65,30 @@ export class SimbiocreacionRepository {
   }
 
   async create(userId: string, data: SimbiData) {
-    return this.db.simbiocreacion.create({ data: { userId, ...data } });
+    return this.db.simbiocreacion.create({
+      data: { userId, ...normalizeGraphData(data) } as Prisma.SimbiocreacionUncheckedCreateInput,
+    });
   }
 
+  // Devuelve la fila actualizada, o null si no existe o no es del usuario (=> 404).
   async update(id: string, userId: string, data: Partial<SimbiData>) {
-    return this.db.simbiocreacion.updateMany({
-      where: { id, userId },
-      data,
+    const owned = await this.db.simbiocreacion.findFirst({
+      where:  { id, userId },
+      select: { id: true },
+    });
+    if (!owned) return null;
+
+    return this.db.simbiocreacion.update({
+      where: { id },
+      data:  normalizeGraphData(data) as Prisma.SimbiocreacionUncheckedUpdateInput,
     });
   }
 
+  // Devuelve true si borró algo; false si no existía o no era del usuario (=> 404).
   async delete(id: string, userId: string) {
-    return this.db.simbiocreacion.deleteMany({
+    const { count } = await this.db.simbiocreacion.deleteMany({
       where: { id, userId },
     });
+    return count > 0;
   }
 }
