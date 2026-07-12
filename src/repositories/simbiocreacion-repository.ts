@@ -32,6 +32,15 @@ export class SimbiocreacionRepository {
     });
   }
 
+  // Una sola simbiocreación pública, por id (para enlaces compartidos).
+  // Devuelve null si no existe o es privada.
+  async findPublicById(id: string) {
+    return this.db.simbiocreacion.findFirst({
+      where:   { id, privado: false },
+      include: { user: { select: { fullName: true, company: true } } },
+    });
+  }
+
   async findPublic() {
     return this.db.simbiocreacion.findMany({
       where:   { privado: false },

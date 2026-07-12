@@ -8,6 +8,17 @@ import { db } from '@/lib/db';
 export const simbiocreacionRouter = new Hono();
 const simbiRepo = new SimbiocreacionRepository(db);
 
+// ── GET /api/simbiocreacion/public/:id  (PÚBLICO — enlaces compartidos) ────────
+// Registrado ANTES del authMiddleware a propósito: cualquiera con el enlace puede
+// ver una simbiocreación NO privada. Las privadas responden 404 (no se filtran).
+simbiocreacionRouter.get('/public/:id', async (c) => {
+  const { id } = c.req.param();
+  const item = await simbiRepo.findPublicById(id);
+  if (!item) throw new ApiError(404, 'Simbiocreación no encontrada o privada');
+  return c.json({ simbiocreacion: item });
+});
+
+// El resto de rutas exige sesión.
 simbiocreacionRouter.use('*', authMiddleware);
 
 // Grafo persistido (coincide con StoredGraph del frontend).
