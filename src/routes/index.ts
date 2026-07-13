@@ -8,3 +8,4 @@ export { simbiocreacionRouter } from './simbiocreacion';
 export { default as esgRouter }      from './esg';
 export { validatorRouter }      from './validator';
 export { certificatesRouter }   from './certificates';
+export { actorsRouter }         from './actors';

@@ -75,9 +75,50 @@ model Profile {
   sectionProgress     SectionProgress[]
   examAttempts        ExamAttempt[]
   certificates        Certificate[]
+  actors              Actor[]
 
 
   @@map("profiles")
+}
+
+// ─── Actores (directorio del ecosistema) ──────────────────────────────────────
+
+enum ActorCategory {
+  proveedores_capital
+  intermediarios
+  bancos
+  gobierno_multilaterales
+  empresa_social
+}
+
+model Actor {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String
+  country          String        // "PE" | "CO"
+  category         ActorCategory
+  subcategory      String?       // categoría/sub original de la fuente (trazabilidad)
+  description      String?
+  services         String?
+  procedencia      String?       // Nacional / Internacional / Latino América
+  geoScope         String?       @map("geo_scope") // Ámbito geográfico
+  instruments      Json          @default("[]")    // string[]
+  sectors          Json          @default("[]")    // string[]
+  aum              String?       // activos de impacto bajo gestión (rango)
+  investmentAmount String?       @map("investment_amount") // monto de inversión (rango)
+  website          String?
+  contactName      String?       @map("contact_name")  // PII — solo gestor/admin
+  contactEmail     String?       @map("contact_email") // PII — solo gestor/admin
+  source           String        // archivo/fuente de origen
+  createdBy        String?       @map("created_by") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  creator Profile? @relation(fields: [createdBy], references: [id])
+
+  @@unique([name, country])
+  @@index([country])
+  @@index([category])
+  @@map("actors")
 }
 
 // ─── Portfolio ────────────────────────────────────────────────────────────────
