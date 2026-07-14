@@ -77,6 +77,7 @@ model Profile {
   certificates        Certificate[]
   actors              Actor[]
   actorFavorites      ActorFavorite[]
+  dataroomUploads     DataroomDocument[]
 
 
   @@map("profiles")
@@ -372,9 +373,61 @@ model Organization {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      Profile            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents DataroomDocument[]
 
   @@map("organizations")
+}
+
+// ─── Dataroom ─────────────────────────────────────────────────────────────────
+// Plantilla global (carpetas + documentos requeridos) que comparten todas las
+// empresas; los archivos subidos cuelgan de la Organization del usuario.
+
+model DataroomFolder {
+  id          String  @id @default(uuid()) @db.Uuid
+  key         String  @unique // panorama, legal, tributario…
+  sortOrder   Int     @map("sort_order")
+  name        String
+  description String?
+
+  items DataroomItem[]
+
+  @@map("dataroom_folders")
+}
+
+model DataroomItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  folderId  String  @map("folder_id") @db.Uuid
+  sortOrder Int     @map("sort_order")
+  name      String  // "Ficha RUC", "Reporte de sostenibilidad"…
+  hint      String? // ayuda opcional
+
+  folder    DataroomFolder     @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  documents DataroomDocument[]
+
+  @@index([folderId])
+  @@map("dataroom_items")
+}
+
+model DataroomDocument {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  itemId         String   @map("item_id") @db.Uuid
+  fileName       String   @map("file_name")    // nombre original
+  storagePath    String   @map("storage_path") // ruta en el disco del VPS
+  mime           String
+  size           Int
+  isPublic       Boolean  @default(false) @map("is_public") // nace PRIVADO siempre
+  uploadedBy     String?  @map("uploaded_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item         DataroomItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  uploader     Profile?     @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([itemId])
+  @@map("dataroom_documents")
 }
 
 // ─── Simbiocreacion ───────────────────────────────────────────────────────────

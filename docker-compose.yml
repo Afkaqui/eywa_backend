@@ -11,6 +11,11 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN}
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      # Archivos del Dataroom en el DISCO DEL HOST: el auto-deploy recrea el
+      # contenedor, así que dentro de él los uploads se perderían.
+      - /home/kaqui/eywa-uploads:/app/uploads
     networks:
       - postgresql_default
       - default
