@@ -8,6 +8,7 @@ export type ActorFilters = {
   q?: string;
   take?: number;
   skip?: number;
+  favoritesOf?: string; // userId → solo los favoritos de ese usuario
 };
 
 export type ActorInput = {
@@ -46,7 +47,35 @@ export class ActorRepository {
         { subcategory: { contains: f.q, mode: 'insensitive' } },
       ];
     }
+    if (f.favoritesOf) where.favorites = { some: { userId: f.favoritesOf } };
     return where;
+  }
+
+  // ── Favoritos (personales; el directorio en sí es global/admin) ──────────────
+
+  async getFavoriteIds(userId: string): Promise<Set<string>> {
+    const rows = await this.db.actorFavorite.findMany({
+      where:  { userId },
+      select: { actorId: true },
+    });
+    return new Set(rows.map(r => r.actorId));
+  }
+
+  // Idempotente: marcar un favorito que ya existe no falla.
+  async addFavorite(userId: string, actorId: string) {
+    const actor = await this.db.actor.findUnique({ where: { id: actorId }, select: { id: true } });
+    if (!actor) return false;
+    await this.db.actorFavorite.upsert({
+      where:  { userId_actorId: { userId, actorId } },
+      update: {},
+      create: { userId, actorId },
+    });
+    return true;
+  }
+
+  async removeFavorite(userId: string, actorId: string) {
+    const { count } = await this.db.actorFavorite.deleteMany({ where: { userId, actorId } });
+    return count > 0;
   }
 
   async list(f: ActorFilters) {

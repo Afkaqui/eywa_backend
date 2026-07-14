@@ -76,6 +76,7 @@ model Profile {
   examAttempts        ExamAttempt[]
   certificates        Certificate[]
   actors              Actor[]
+  actorFavorites      ActorFavorite[]
 
 
   @@map("profiles")
@@ -119,6 +120,24 @@ model Actor {
   @@index([country])
   @@index([category])
   @@map("actors")
+
+  favorites ActorFavorite[]
+}
+
+// Favorito de un usuario sobre un actor del directorio (el directorio es global y
+// solo lo modifican admins/gestores; los favoritos SÍ son personales).
+model ActorFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  actorId   String   @map("actor_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor Actor   @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, actorId])
+  @@index([userId])
+  @@map("actor_favorites")
 }
 
 // ─── Portfolio ────────────────────────────────────────────────────────────────

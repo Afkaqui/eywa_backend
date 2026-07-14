@@ -15,9 +15,10 @@ const MANAGERS = ['gestor', 'admin', 'superadmin'] as const;
 const CATEGORIES = ['proveedores_capital', 'intermediarios', 'bancos', 'gobierno_multilaterales', 'empresa_social'] as const;
 
 // Serializa un actor. La PII (contacto/correo) solo se incluye para gestor/admin.
-function serialize(a: Actor, canSeePII: boolean) {
+function serialize(a: Actor, canSeePII: boolean, isFavorite = false) {
   return {
     id:                a.id,
+    is_favorite:       isFavorite,
     name:              a.name,
     country:           a.country,
     category:          a.category,
@@ -54,14 +55,34 @@ actorsRouter.get('/', async (c) => {
     sector:     q.sector || undefined,
     instrument: q.instrument || undefined,
     q:          q.q || undefined,
+    favoritesOf: q.favorites === 'true' ? user.sub : undefined,
     take, skip,
   });
 
+  const favIds = await actorRepo.getFavoriteIds(user.sub);
+
   return c.json({
-    actors: items.map(a => serialize(a, canSeePII)),
+    actors: items.map(a => serialize(a, canSeePII, favIds.has(a.id))),
     total,
     can_see_contact: canSeePII,
+    can_edit: MANAGERS.includes(user.role as typeof MANAGERS[number]), // el directorio solo lo edita admin/gestor
   });
+});
+
+// ── Favoritos (personales) ────────────────────────────────────────────────────
+// El directorio es global y solo lo modifican admin/gestor; marcar favoritos SÍ
+// puede hacerlo cualquier usuario, y solo afecta a su propia lista.
+actorsRouter.post('/:id/favorite', async (c) => {
+  const user = getRequestUser(c);
+  const ok = await actorRepo.addFavorite(user.sub, c.req.param('id'));
+  if (!ok) throw new ApiError(404, 'Actor no encontrado');
+  return c.json({ is_favorite: true });
+});
+
+actorsRouter.delete('/:id/favorite', async (c) => {
+  const user = getRequestUser(c);
+  await actorRepo.removeFavorite(user.sub, c.req.param('id'));
+  return c.json({ is_favorite: false });
 });
 
 // ── GET /api/actors/facets ────────────────────────────────────────────────────
@@ -75,7 +96,8 @@ actorsRouter.get('/:id', async (c) => {
   const canSeePII = MANAGERS.includes(user.role as typeof MANAGERS[number]);
   const actor = await actorRepo.getById(c.req.param('id'));
   if (!actor) throw new ApiError(404, 'Actor no encontrado');
-  return c.json({ actor: serialize(actor, canSeePII) });
+  const favIds = await actorRepo.getFavoriteIds(user.sub);
+  return c.json({ actor: serialize(actor, canSeePII, favIds.has(actor.id)) });
 });
 
 // ── Escritura (gestor+) ───────────────────────────────────────────────────────
