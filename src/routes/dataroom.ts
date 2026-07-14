@@ -10,6 +10,61 @@ import { db } from '@/lib/db';
 export const dataroomRouter = new Hono();
 const repo = new DataroomRepository(db);
 
+// ══ RUTAS PÚBLICAS (sin sesión) ══════════════════════════════════════════════
+// Registradas ANTES del authMiddleware a propósito. Solo exponen lo que el dueño
+// marcó explícitamente como público. Nunca los documentos privados.
+
+// Descarga de un documento PÚBLICO (la ruta específica va antes que /public/:slug)
+dataroomRouter.get('/public/documents/:id/download', async (c) => {
+  const doc = await repo.getDocument(c.req.param('id'));
+  if (!doc || !doc.isPublic) throw new ApiError(404, 'Documento no disponible');
+
+  const org = await repo.getOrganizationById(doc.organizationId);
+  if (!org?.publicEnabled) throw new ApiError(404, 'Documento no disponible');
+
+  let data: Buffer;
+  try { data = await readFile(doc.storagePath); }
+  catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
+
+  c.header('Content-Type', doc.mime);
+  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
+  return c.body(new Uint8Array(data));
+});
+
+// Datos de la mini-landing de una empresa
+dataroomRouter.get('/public/:slug', async (c) => {
+  const org = await repo.findBySlug(c.req.param('slug'));
+  if (!org || !org.publicEnabled) throw new ApiError(404, 'Empresa no encontrada');
+
+  const [docs, completeness] = await Promise.all([
+    repo.getPublicDocumentsOf(org.id),
+    repo.completenessOf(org.id),
+  ]);
+
+  return c.json({
+    organization: {
+      name:          org.name,
+      type:          org.type,
+      description:   org.description,
+      sector:        org.sector,
+      country:       org.country,
+      website:       org.website,
+      externalLinks: org.externalLinks,
+    },
+    completeness, // sello de confianza (no revela QUÉ documentos faltan)
+    documents: docs.map(d => ({
+      id:         d.id,
+      file_name:  d.fileName,
+      mime:       d.mime,
+      size:       d.size,
+      folder:     d.item.folder.name,
+      item:       d.item.name,
+      created_at: d.createdAt.toISOString(),
+    })),
+  });
+});
+
+// ══ De aquí en adelante, todo exige sesión ═══════════════════════════════════
 dataroomRouter.use('*', authMiddleware);
 
 // Disco del VPS (volumen montado; ver docker-compose). Fuera del contenedor sobrevive
@@ -198,4 +253,43 @@ dataroomRouter.patch('/documents/:id', async (c) => {
   const isPublic = Boolean(body?.is_public);
   const updated = await repo.setPublic(doc.id, isPublic);
   return c.json({ document: serializeDoc(updated) });
+});
+
+// ── GET/PATCH /api/dataroom/landing ───────────────────────────────────────────
+// Estado y activación de la mini-landing pública de mi empresa.
+function slugify(name: string) {
+  return name
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quita tildes
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'empresa';
+}
+
+dataroomRouter.get('/landing', async (c) => {
+  const user = getRequestUser(c);
+  const org = await repo.getOrganizationOf(user.sub);
+  if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
+  return c.json({ enabled: org.publicEnabled, slug: org.publicSlug });
+});
+
+dataroomRouter.patch('/landing', async (c) => {
+  const user = getRequestUser(c);
+  const org = await repo.getOrganizationOf(user.sub);
+  if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
+
+  const body = await c.req.json().catch(() => ({}));
+  const enabled = Boolean(body?.enabled);
+
+  // Genera el slug la primera vez que se publica (y lo conserva después)
+  let slug = org.publicSlug;
+  if (enabled && !slug) {
+    const base = slugify(org.name);
+    slug = base;
+    let n = 1;
+    while (await repo.slugTaken(slug)) slug = `${base}-${++n}`;
+  }
+
+  const updated = await repo.setLanding(org.id, { publicEnabled: enabled, ...(slug ? { publicSlug: slug } : {}) });
+  return c.json({ enabled: updated.publicEnabled, slug: updated.publicSlug });
 });

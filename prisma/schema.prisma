@@ -370,6 +370,8 @@ model Organization {
   externalLinks   Json     @default("[]") @map("external_links")
   country         String?
   sector          String?
+  publicEnabled   Boolean  @default(false) @map("public_enabled") // mini-landing activa
+  publicSlug      String?  @unique @map("public_slug")            // /empresa/<slug>
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
