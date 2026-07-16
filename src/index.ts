@@ -16,6 +16,7 @@ import { actorsRouter }           from '@/routes/actors';
 import { dataroomRouter }         from '@/routes/dataroom';
 import { mediaRouter }            from '@/routes/media';
 import { fundsRouter }            from '@/routes/funds';
+import { notificationsRouter }    from '@/routes/notifications';
 import { ApiError } from '@/lib/auth-helpers';
 
 const app = new Hono();
@@ -43,6 +44,7 @@ app.route('/api/actors',          actorsRouter);
 app.route('/api/dataroom',        dataroomRouter);
 app.route('/api/media',           mediaRouter);
 app.route('/api/funds',           fundsRouter);
+app.route('/api/notifications',   notificationsRouter);
 
 // Manejo global de errores
 app.onError((err, c) => {
