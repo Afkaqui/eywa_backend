@@ -79,6 +79,8 @@ model Profile {
   actors              Actor[]
   actorFavorites      ActorFavorite[]
   dataroomUploads     DataroomDocument[]
+  dataroomGrants      DataroomAccessGrant[] @relation("DataroomGrants")
+  dataroomAccessLogs  DataroomAccessLog[]   @relation("DataroomAccessLogs")
 
 
   @@map("profiles")
@@ -379,8 +381,9 @@ model Organization {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  user      Profile            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      Profile               @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents DataroomDocument[]
+  grants    DataroomAccessGrant[]
 
   @@map("organizations")
 }
@@ -450,13 +453,46 @@ model DataroomDocument {
   uploadedBy     String?  @map("uploaded_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  item         DataroomItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  uploader     Profile?     @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item         DataroomItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  uploader     Profile?            @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  accessLogs   DataroomAccessLog[]
 
   @@index([organizationId])
   @@index([itemId])
   @@map("dataroom_documents")
+}
+
+// Permiso delegado: el superadmin habilita a un gestor a VER (solo lectura +
+// descarga) el dataroom de una organización concreta. Decisión 2026-07-16.
+model DataroomAccessGrant {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  gestorId       String   @map("gestor_id") @db.Uuid
+  grantedBy      String   @map("granted_by") @db.Uuid // superadmin que lo otorgó
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  gestor       Profile      @relation("DataroomGrants", fields: [gestorId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, gestorId])
+  @@map("dataroom_access_grants")
+}
+
+// Bitácora de accesos a documentos del dataroom (quién descargó qué y cuándo).
+// user_id NULL = descarga pública desde la mini-landing.
+model DataroomAccessLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @default("download") // download | download_public
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document DataroomDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     Profile?         @relation("DataroomAccessLogs", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@map("dataroom_access_logs")
 }
 
 // ─── Simbiocreacion ───────────────────────────────────────────────────────────

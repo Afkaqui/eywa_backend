@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { mkdir, writeFile, readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { authMiddleware } from '@/middleware/auth';
-import { getRequestUser, ApiError } from '@/lib/auth-helpers';
+import { getRequestUser, assertRole, ApiError } from '@/lib/auth-helpers';
 import { DataroomRepository } from '@/repositories/dataroom-repository';
 import { db } from '@/lib/db';
 
@@ -26,6 +26,9 @@ dataroomRouter.get('/public/documents/:id/download', async (c) => {
   try { data = await readFile(doc.storagePath); }
   catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
 
+  // Bitácora: descarga pública (sin sesión) desde la mini-landing
+  await repo.logAccess({ documentId: doc.id, userId: null, action: 'download_public' });
+
   c.header('Content-Type', doc.mime);
   c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
   return c.body(new Uint8Array(data));
@@ -38,7 +41,7 @@ dataroomRouter.get('/public/:slug', async (c) => {
 
   const [docs, completeness] = await Promise.all([
     repo.getPublicDocumentsOf(org.id),
-    repo.completenessOf(org.id),
+    repo.completenessOf(org.id, org.userId), // incluye ítems completos vía plataforma
   ]);
 
   return c.json({
@@ -104,20 +107,44 @@ function serializeDoc(d: {
 }
 
 // Resuelve la organización sobre la que se opera y valida permisos de lectura.
-// Dueño siempre; superadmin ve todo. (Gestor con permiso delegado: PENDIENTE.)
+// Dueño siempre; superadmin ve todo; gestor solo las que le hayan delegado.
 async function resolveOrg(userId: string, role: string) {
   const org = await repo.getOrganizationOf(userId);
   return { org, isSuperadmin: role === 'superadmin' };
 }
 
+// ¿Puede este usuario LEER (ver/descargar) el dataroom de esta organización?
+async function canRead(userId: string, role: string, organizationId: string): Promise<boolean> {
+  if (role === 'superadmin') return true;
+  const own = await repo.getOrganizationOf(userId);
+  if (own?.id === organizationId) return true;
+  if (['gestor', 'admin'].includes(role)) return repo.hasGrant(organizationId, userId);
+  return false;
+}
+
 // ── GET /api/dataroom ─────────────────────────────────────────────────────────
-// Plantilla + documentos de mi organización + % de completitud.
+// Plantilla + documentos + % de completitud. Sin ?orgId= opera sobre MI organización;
+// con ?orgId= permite a superadmin (todo) o gestor con permiso delegado (solo lectura).
 dataroomRouter.get('/', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const ownOrg = await repo.getOrganizationOf(user.sub);
+
+  const requestedOrgId = c.req.query('orgId');
+  let org = ownOrg;
+  let readOnly = false;
+  if (requestedOrgId && requestedOrgId !== ownOrg?.id) {
+    if (!(await canRead(user.sub, user.role, requestedOrgId))) {
+      throw new ApiError(403, 'Sin acceso a este dataroom');
+    }
+    org = await repo.getOrganizationById(requestedOrgId);
+    if (!org) throw new ApiError(404, 'Organización no encontrada');
+    readOnly = true; // vista delegada: solo ver y descargar
+  }
 
   const folders = await repo.getTemplate();
   const docs = org ? await repo.getDocumentsOf(org.id) : [];
+  // Ítems ASG completos vía plataforma (diagnóstico GENES / certificados Academia)
+  const platform = org ? await repo.platformCompletions(org.userId) : new Map<string, string>();
   const byItem = new Map<string, typeof docs>();
   for (const d of docs) {
     const list = byItem.get(d.itemId) ?? [];
@@ -131,13 +158,17 @@ dataroomRouter.get('/', async (c) => {
   const payload = folders.map(f => {
     const items = f.items.map(i => {
       const itemDocs = byItem.get(i.id) ?? [];
+      const platformNote = platform.get(i.id) ?? null;
+      const completed = itemDocs.length > 0 || Boolean(platformNote);
       totalItems++;
-      if (itemDocs.length > 0) completedItems++;
+      if (completed) completedItems++;
       return {
         id:        i.id,
         name:      i.name,
         hint:      i.hint,
-        completed: itemDocs.length > 0,
+        completed,
+        platform_complete: Boolean(platformNote),
+        platform_note:     platformNote,
         documents: itemDocs.map(serializeDoc),
       };
     });
@@ -157,6 +188,7 @@ dataroomRouter.get('/', async (c) => {
   return c.json({
     has_organization: Boolean(org),
     organization: org ? { id: org.id, name: org.name } : null,
+    read_only: readOnly,
     folders: payload,
     completeness: {
       completed_items: completedItems,
@@ -206,14 +238,15 @@ dataroomRouter.post('/items/:itemId/documents', async (c) => {
 });
 
 // ── GET /api/dataroom/documents/:id/download ──────────────────────────────────
+// Dueño, superadmin, o gestor con permiso delegado sobre esa organización.
 dataroomRouter.get('/documents/:id/download', async (c) => {
   const user = getRequestUser(c);
   const doc = await repo.getDocument(c.req.param('id'));
   if (!doc) throw new ApiError(404, 'Documento no encontrado');
 
-  const { org, isSuperadmin } = await resolveOrg(user.sub, user.role);
-  const isOwner = org?.id === doc.organizationId;
-  if (!isOwner && !isSuperadmin) throw new ApiError(403, 'Sin acceso a este documento');
+  if (!(await canRead(user.sub, user.role, doc.organizationId))) {
+    throw new ApiError(403, 'Sin acceso a este documento');
+  }
 
   let data: Buffer;
   try {
@@ -221,6 +254,9 @@ dataroomRouter.get('/documents/:id/download', async (c) => {
   } catch {
     throw new ApiError(404, 'El archivo ya no está disponible');
   }
+
+  // Bitácora: quién descargó qué y cuándo
+  await repo.logAccess({ documentId: doc.id, userId: user.sub, action: 'download' });
 
   c.header('Content-Type', doc.mime);
   c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
@@ -294,4 +330,110 @@ dataroomRouter.patch('/landing', async (c) => {
 
   const updated = await repo.setLanding(org.id, { publicEnabled: enabled, ...(slug ? { publicSlug: slug } : {}) });
   return c.json({ enabled: updated.publicEnabled, slug: updated.publicSlug });
+});
+
+// ══ Permisos delegados a gestores (solo superadmin administra) ════════════════
+
+// GET /api/dataroom/grants — lista de permisos + opciones para el selector
+dataroomRouter.get('/grants', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['superadmin']);
+
+  const [grants, organizations, gestores] = await Promise.all([
+    repo.listGrants(),
+    db.organization.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    db.profile.findMany({
+      where:   { role: { in: ['gestor', 'admin'] } },
+      select:  { id: true, email: true, fullName: true, role: true },
+      orderBy: { email: 'asc' },
+    }),
+  ]);
+
+  return c.json({
+    grants: grants.map(g => ({
+      id:           g.id,
+      organization: g.organization,
+      gestor:       { id: g.gestor.id, email: g.gestor.email, name: g.gestor.fullName },
+      created_at:   g.createdAt.toISOString(),
+    })),
+    organizations,
+    gestores,
+  });
+});
+
+// POST /api/dataroom/grants { organization_id, gestor_id }
+dataroomRouter.post('/grants', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['superadmin']);
+
+  const body = await c.req.json().catch(() => ({}));
+  const organizationId = String(body?.organization_id ?? '');
+  const gestorId = String(body?.gestor_id ?? '');
+  if (!organizationId || !gestorId) throw new ApiError(400, 'organization_id y gestor_id son obligatorios');
+
+  const [org, gestor] = await Promise.all([
+    repo.getOrganizationById(organizationId),
+    db.profile.findUnique({ where: { id: gestorId }, select: { id: true, role: true } }),
+  ]);
+  if (!org) throw new ApiError(404, 'Organización no encontrada');
+  if (!gestor || !['gestor', 'admin'].includes(gestor.role)) {
+    throw new ApiError(400, 'El usuario debe tener rol gestor o admin');
+  }
+
+  const grant = await repo.createGrant({ organizationId, gestorId, grantedBy: user.sub });
+  return c.json({ grant: { id: grant.id } }, 201);
+});
+
+// DELETE /api/dataroom/grants/:id
+dataroomRouter.delete('/grants/:id', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['superadmin']);
+  try {
+    await repo.deleteGrant(c.req.param('id'));
+  } catch {
+    throw new ApiError(404, 'Permiso no encontrado');
+  }
+  return c.json({ success: true });
+});
+
+// GET /api/dataroom/granted — datarooms que ME delegaron (gestor/admin)
+dataroomRouter.get('/granted', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+
+  // Superadmin ve todos los datarooms; gestor/admin solo los delegados
+  if (user.role === 'superadmin') {
+    const orgs = await db.organization.findMany({
+      select: { id: true, name: true, sector: true }, orderBy: { name: 'asc' },
+    });
+    return c.json({ organizations: orgs });
+  }
+  const grants = await repo.grantsForGestor(user.sub);
+  return c.json({ organizations: grants.map(g => g.organization) });
+});
+
+// ══ Bitácora de accesos (dueño o superadmin) ══════════════════════════════════
+// GET /api/dataroom/access-log[?orgId=] — quién descargó qué y cuándo
+dataroomRouter.get('/access-log', async (c) => {
+  const user = getRequestUser(c);
+  const ownOrg = await repo.getOrganizationOf(user.sub);
+
+  const requestedOrgId = c.req.query('orgId');
+  let orgId = ownOrg?.id ?? null;
+  if (requestedOrgId && requestedOrgId !== ownOrg?.id) {
+    if (user.role !== 'superadmin') throw new ApiError(403, 'Solo el dueño ve su bitácora');
+    orgId = requestedOrgId;
+  }
+  if (!orgId) throw new ApiError(400, 'Primero crea el perfil de tu organización');
+
+  const logs = await repo.accessLogsOf(orgId);
+  return c.json({
+    logs: logs.map(l => ({
+      id:        l.id,
+      file_name: l.document.fileName,
+      action:    l.action,
+      user:      l.user ? (l.user.fullName || l.user.email) : 'Visitante (mini-landing pública)',
+      created_at: l.createdAt.toISOString(),
+    })),
+  });
 });
