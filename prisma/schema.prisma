@@ -55,6 +55,7 @@ model Profile {
   email     String   @unique
   fullName  String?  @map("full_name")
   company   String?
+  avatarUrl String?  @map("avatar_url") // ruta en disco del avatar (volumen VPS)
   password  String   // bcrypt hash
   role      UserRole @default(user)
   plan      UserPlan @default(free)
@@ -372,6 +373,7 @@ model Organization {
   externalLinks   Json     @default("[]") @map("external_links")
   country         String?
   sector          String?
+  imageUrl        String?  @map("image_url") // ruta en disco del logo (volumen VPS)
   publicEnabled   Boolean  @default(false) @map("public_enabled") // mini-landing activa
   publicSlug      String?  @unique @map("public_slug")            // /empresa/<slug>
   createdAt       DateTime @default(now()) @map("created_at")

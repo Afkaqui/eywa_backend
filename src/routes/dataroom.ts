@@ -43,6 +43,7 @@ dataroomRouter.get('/public/:slug', async (c) => {
 
   return c.json({
     organization: {
+      id:            org.id,
       name:          org.name,
       type:          org.type,
       description:   org.description,
@@ -50,6 +51,7 @@ dataroomRouter.get('/public/:slug', async (c) => {
       country:       org.country,
       website:       org.website,
       externalLinks: org.externalLinks,
+      has_logo:      !!org.imageUrl,
     },
     completeness, // sello de confianza (no revela QUÉ documentos faltan)
     documents: docs.map(d => ({
