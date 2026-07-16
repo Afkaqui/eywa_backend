@@ -15,9 +15,15 @@ portfolioRouter.use('*', authMiddleware);
 // reales (empresas vinculadas a usuarios, score = diagnóstico GENES) + las empresas
 // EXTERNAS que el gestor agrega a mano (tabla portfolio_companies).
 portfolioRouter.get('/', async (c) => {
-  const [manual, orgs] = await Promise.all([
+  const [manual, orgs, incompleteProfiles] = await Promise.all([
     portfolioRepo.getAll(),
     db.organization.findMany(),
+    // Usuarios que declararon empresa al registrarse pero no han completado
+    // Mi Organización: se muestran como "Registro incompleto" (decisión 2026-07-16)
+    db.profile.findMany({
+      where:  { organization: { is: null } },
+      select: { id: true, company: true, createdAt: true, updatedAt: true },
+    }),
   ]);
 
   // Último resultado del diagnóstico por usuario (dueño de cada organización)
@@ -55,6 +61,28 @@ portfolioRouter.get('/', async (c) => {
     };
   });
 
+  const incomplete = incompleteProfiles
+    .filter((p) => (p.company ?? '').trim())
+    .map((p) => ({
+      id:         p.id, // id del perfil (único, no colisiona con orgs ni manuales)
+      source:     'plataforma' as const,
+      incomplete: true,
+      name:       (p.company as string).trim(),
+      sector:     null,
+      score:      null,
+      level:      null,
+      status:     'Registro incompleto',
+      risk:       null,
+      carbon:     null,
+      trend:      null,
+      lastAudit:  null,
+      hasLogo:    false,
+      orgId:      null,
+      publicSlug: null,
+      createdAt:  p.createdAt,
+      updatedAt:  p.updatedAt,
+    }));
+
   const manualRows = manual.map((m) => ({
     ...m,
     source:     'manual' as const,
@@ -64,10 +92,10 @@ portfolioRouter.get('/', async (c) => {
     publicSlug: null,
   }));
 
-  // Plataforma primero (ordenadas por score desc, sin diagnóstico al final), luego externas
+  // Plataforma primero (por score desc), luego registros incompletos, luego externas
   const byScore = (a: { score: number | null }, b: { score: number | null }) =>
     (b.score ?? -1) - (a.score ?? -1);
-  return c.json({ companies: [...platform.sort(byScore), ...manualRows] });
+  return c.json({ companies: [...platform.sort(byScore), ...incomplete, ...manualRows] });
 });
 
 // ── POST /api/portfolio  (gestor+) ────────────────────────────────────────────
