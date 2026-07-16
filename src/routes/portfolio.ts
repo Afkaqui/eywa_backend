@@ -11,9 +11,63 @@ const portfolioRepo = new PortfolioRepository(db);
 portfolioRouter.use('*', authMiddleware);
 
 // ── GET /api/portfolio ────────────────────────────────────────────────────────
+// Híbrido (decisión 2026-07-16): el portfolio se alimenta de las ORGANIZACIONES
+// reales (empresas vinculadas a usuarios, score = diagnóstico GENES) + las empresas
+// EXTERNAS que el gestor agrega a mano (tabla portfolio_companies).
 portfolioRouter.get('/', async (c) => {
-  const companies = await portfolioRepo.getAll();
-  return c.json({ companies });
+  const [manual, orgs] = await Promise.all([
+    portfolioRepo.getAll(),
+    db.organization.findMany(),
+  ]);
+
+  // Último resultado del diagnóstico por usuario (dueño de cada organización)
+  const userIds = orgs.map((o) => o.userId);
+  const results = userIds.length
+    ? await db.diagnosticResult.findMany({
+        where:   { userId: { in: userIds } },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
+  const latest = new Map<string, (typeof results)[number]>();
+  for (const r of results) if (!latest.has(r.userId)) latest.set(r.userId, r);
+
+  const platform = orgs.map((o) => {
+    const r = latest.get(o.userId);
+    return {
+      id:         o.id,
+      source:     'plataforma' as const,
+      name:       o.name,
+      sector:     o.sector ?? null,
+      // score en % (0-100) del diagnóstico GENES; null = aún sin diagnóstico → "Pendiente"
+      score:      r?.percentage ?? null,
+      level:      r?.level ?? null, // banda GENES
+      status:     r ? 'Diagnóstico realizado' : 'Diagnóstico pendiente',
+      // riesgo derivado de la banda (escala 0-75): ≥61 bajo · ≥46 medio · <46 alto
+      risk:       r ? (r.score >= 61 ? 'bajo' : r.score >= 46 ? 'medio' : 'alto') : null,
+      carbon:     null,
+      trend:      null,
+      lastAudit:  null,
+      hasLogo:    !!o.imageUrl,
+      orgId:      o.id,
+      publicSlug: o.publicEnabled ? o.publicSlug : null,
+      createdAt:  o.createdAt,
+      updatedAt:  o.updatedAt,
+    };
+  });
+
+  const manualRows = manual.map((m) => ({
+    ...m,
+    source:     'manual' as const,
+    level:      null,
+    hasLogo:    false,
+    orgId:      null,
+    publicSlug: null,
+  }));
+
+  // Plataforma primero (ordenadas por score desc, sin diagnóstico al final), luego externas
+  const byScore = (a: { score: number | null }, b: { score: number | null }) =>
+    (b.score ?? -1) - (a.score ?? -1);
+  return c.json({ companies: [...platform.sort(byScore), ...manualRows] });
 });
 
 // ── POST /api/portfolio  (gestor+) ────────────────────────────────────────────
@@ -55,7 +109,13 @@ portfolioRouter.patch('/:id', async (c) => {
   const { id } = c.req.param();
   const body = await c.req.json();
 
-  await portfolioRepo.update(id, body);
+  // Solo las empresas EXTERNAS (manuales) se editan aquí; las de la plataforma
+  // se gestionan desde el perfil de la propia organización.
+  try {
+    await portfolioRepo.update(id, body);
+  } catch {
+    throw new ApiError(404, 'Solo las empresas externas (manuales) se editan aquí');
+  }
   return c.json({ success: true });
 });
 
@@ -65,6 +125,10 @@ portfolioRouter.delete('/:id', async (c) => {
   assertRole(user, ['gestor', 'admin', 'superadmin']);
 
   const { id } = c.req.param();
-  await portfolioRepo.delete(id);
+  try {
+    await portfolioRepo.delete(id);
+  } catch {
+    throw new ApiError(404, 'Solo las empresas externas (manuales) se eliminan aquí');
+  }
   return c.json({ success: true });
 });
