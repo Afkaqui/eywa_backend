@@ -6,7 +6,7 @@ export type UserPlan = 'free' | 'premium';
 export interface DiagnosticResult {
   score:       number;
   maxScore:    number;
-  breakdown:   { label: string; score: number; maxScore: number }[];
+  breakdown:   { label: string; score: number; maxScore: number; category?: string }[];
   completedAt: string;
 }
 

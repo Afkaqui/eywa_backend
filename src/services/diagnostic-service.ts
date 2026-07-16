@@ -1,5 +1,5 @@
 import { DiagnosticRepository } from '@/repositories/diagnostic-repository';
-import { calculatePercentage, getScoreLevel } from '@/lib/scoring';
+import { calculatePercentage, getGenesBand, GENES_SCALE, GENES_MAX_POINTS } from '@/lib/scoring';
 import type { DiagnosticResult } from '@/types/database';
 
 export class DiagnosticService {
@@ -21,8 +21,9 @@ export class DiagnosticService {
   }
 
   async saveResult(userId: string, result: DiagnosticResult): Promise<void> {
+    // result.score ya viene en la escala GENES (0-75); result.maxScore = 75.
     const percentage = calculatePercentage(result.score, result.maxScore);
-    const level      = getScoreLevel(percentage);
+    const level      = getGenesBand(result.score); // banda oficial GENES
 
     await this.repository.saveResult({
       userId,
@@ -34,30 +35,33 @@ export class DiagnosticService {
     });
   }
 
-  // Calcula score total a partir de respuestas { questionId → optionValue }
+  // Calcula el puntaje PONDERADO (metodología GENES) a partir de las respuestas.
+  // Cada criterio se puntúa 0-5 (opción elegida) y aporta (puntos × peso). Los pesos
+  // suman 1.0, así que el ponderado va de 0 a 5; se lleva a la escala 0-75 de las bandas.
   static calculateScore(
     questions: Awaited<ReturnType<DiagnosticRepository['getQuestions']>>,
     answers: Record<string, string>
   ): DiagnosticResult {
-    let totalScore    = 0;
-    let totalMaxScore = 0;
+    let weighted = 0; // Σ(puntos × peso), 0..5
     const breakdown: DiagnosticResult['breakdown'] = [];
 
     for (const question of questions) {
-      const selectedValue  = answers[question.id];
       const options        = question.options ?? [];
-      const maxQuestionScore = Math.max(...options.map(o => o.score), 0);
-      const selectedOption   = options.find(o => o.value === selectedValue);
-      const questionScore    = selectedOption?.score ?? 0;
+      const selectedOption = options.find(o => o.value === answers[question.id]);
+      const points         = selectedOption?.score ?? 0;          // 0..5
+      const weight         = (question as { weight?: number }).weight ?? 0;
+      const category       = (question as { category?: string }).category ?? 'general';
 
-      totalScore    += questionScore;
-      totalMaxScore += maxQuestionScore;
-      breakdown.push({ label: question.title, score: questionScore, maxScore: maxQuestionScore });
+      weighted += points * weight;
+      breakdown.push({ label: question.title, score: points, maxScore: GENES_MAX_POINTS, category });
     }
 
+    // Ponderado (0-5) → escala de bandas (0-75)
+    const genesScore = Math.round(weighted * (GENES_SCALE / GENES_MAX_POINTS));
+
     return {
-      score:       totalScore,
-      maxScore:    totalMaxScore,
+      score:       genesScore,
+      maxScore:    GENES_SCALE,
       breakdown,
       completedAt: new Date().toISOString(),
     };

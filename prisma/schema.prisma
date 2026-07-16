@@ -167,6 +167,8 @@ model PortfolioCompany {
 model DiagnosticQuestion {
   id                 String   @id @default(uuid()) @db.Uuid
   sortOrder          Int      @default(0) @map("sort_order")
+  category           String   @default("general") // categoría GENES: perfil | ambiental | social | economico
+  weight             Float    @default(0)          // peso del criterio (los pesos GENES suman 1.0)
   title              String
   description        String
   contextTitle       String?  @map("context_title")
