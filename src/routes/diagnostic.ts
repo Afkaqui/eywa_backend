@@ -33,6 +33,7 @@ const resultSchema = z.object({
     label:    z.string(),
     score:    z.number(),
     maxScore: z.number(),
+    category: z.string().optional(),
   })),
 });
 
