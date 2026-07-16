@@ -25,11 +25,13 @@ simbiocreacionRouter.use('*', authMiddleware);
 // null = el usuario borró su grafo personalizado.
 const graphSchema = z.object({
   nodes: z.array(z.object({
-    id:     z.string(),
-    label:  z.string(),
-    type:   z.enum(['center', 'category', 'group', 'person']),
-    color:  z.string(),
-    userId: z.string().optional(),
+    id:      z.string(),
+    label:   z.string(),
+    // 'institution' (Fase 5): institución del Directorio de Actores en el grafo
+    type:    z.enum(['center', 'category', 'group', 'person', 'institution']),
+    color:   z.string(),
+    userId:  z.string().optional(),
+    actorId: z.string().optional(), // referencia al Actor del directorio
   })),
   edges: z.array(z.object({ from: z.string(), to: z.string() })),
 });
