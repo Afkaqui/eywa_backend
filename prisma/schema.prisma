@@ -385,6 +385,29 @@ model Organization {
   @@map("organizations")
 }
 
+// ─── Fondos ───────────────────────────────────────────────────────────────────
+// Catálogo de oportunidades de financiamiento (fuente: matriz Neo, 2026-07-16).
+// Solo Premium (o gestor+). Los campos internos del Excel (prioridad, estado,
+// responsable…) se DESCARTARON por decisión del usuario: catálogo limpio.
+
+model Fund {
+  id              String    @id @default(uuid()) @db.Uuid
+  scope           String    // nacional | internacional
+  name            String
+  instrumentType  String    @map("instrument_type") // Fondo/Grant, Fellowship, Blended Finance…
+  eligibleProfile String?   @map("eligible_profile")
+  sectors         String?
+  amounts         String?
+  deadline        DateTime? // cierre si es una fecha concreta
+  deadlineText    String?   @map("deadline_text") // "Por convocatoria", "Abierto", "Ventanilla…"
+  checklist       String?   // evidencia Gate 0
+  url             String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("funds")
+}
+
 // ─── Dataroom ─────────────────────────────────────────────────────────────────
 // Plantilla global (carpetas + documentos requeridos) que comparten todas las
 // empresas; los archivos subidos cuelgan de la Organization del usuario.
