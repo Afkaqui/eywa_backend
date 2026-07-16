@@ -530,9 +530,27 @@ model ProjectPlan {
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
 
-  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planDocuments PlanDocument[]
 
   @@index([userId])
   @@index([userId, createdAt(sort: Desc)])
   @@map("project_plans")
+}
+
+// Documentos REALES de un proyecto del Validador (archivo en el volumen del VPS).
+// Reemplaza al Json `documents` de project_plans, que solo guardaba metadata.
+model PlanDocument {
+  id          String   @id @default(uuid()) @db.Uuid
+  planId      String   @map("plan_id") @db.Uuid
+  fileName    String   @map("file_name")
+  mime        String
+  size        Int
+  storagePath String   @map("storage_path") // ruta en disco (UPLOAD_DIR/validator/<planId>/…)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  plan ProjectPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("plan_documents")
 }
