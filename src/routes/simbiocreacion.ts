@@ -18,7 +18,16 @@ simbiocreacionRouter.get('/public/:id', async (c) => {
   return c.json({ simbiocreacion: item });
 });
 
-// El resto de rutas exige sesión.
+// ── GET /api/simbiocreacion/public  (PÚBLICO — lista para Explora) ─────────────
+// Solo devuelve simbiocreaciones NO privadas (el mismo contenido que ya expone
+// /public/:id una a una), así que no exige sesión. Deuda saldada 2026-07-16.
+simbiocreacionRouter.get('/public', async (_c) => {
+  const items = await simbiRepo.findPublic();
+  return _c.json({ simbiocreaciones: items });
+});
+
+// El resto de rutas exige sesión. OJO: /ranking se queda AUTENTICADO a propósito
+// (expone nombres de usuarios; es un leaderboard interno de la comunidad).
 simbiocreacionRouter.use('*', authMiddleware);
 
 // Grafo persistido (coincide con StoredGraph del frontend).
@@ -90,13 +99,8 @@ simbiocreacionRouter.delete('/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// GET /api/simbiocreacion/public  — all public simbiocreaciones (for Explora)
-simbiocreacionRouter.get('/public', async (_c) => {
-  const items = await simbiRepo.findPublic();
-  return _c.json({ simbiocreaciones: items });
-});
-
-// GET /api/simbiocreacion/ranking — users ranked by puntaje
+// GET /api/simbiocreacion/ranking — comunidad ordenada por métricas reales
+// (simbiocreaciones totales, públicas y actores mapeados). Autenticado a propósito.
 simbiocreacionRouter.get('/ranking', async (_c) => {
   const ranking = await simbiRepo.getRanking();
   return _c.json({ ranking });

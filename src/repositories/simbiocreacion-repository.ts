@@ -52,6 +52,9 @@ export class SimbiocreacionRepository {
     });
   }
 
+  // Ranking con métricas REALES y transparentes (se eliminó el "puntaje" sintético
+  // total×10 por la regla de honestidad, 2026-07-16): simbiocreaciones totales,
+  // cuántas son públicas y cuántos actores (personas/instituciones) mapearon en sus grafos.
   async getRanking() {
     const groups = await this.db.simbiocreacion.groupBy({
       by:      ['userId'],
@@ -60,16 +63,33 @@ export class SimbiocreacionRepository {
       take:    30,
     });
     const userIds = groups.map(g => g.userId);
-    const users = await this.db.profile.findMany({
-      where:  { id: { in: userIds } },
-      select: { id: true, fullName: true, company: true },
-    });
+    const [users, rows] = await Promise.all([
+      this.db.profile.findMany({
+        where:  { id: { in: userIds } },
+        select: { id: true, fullName: true, company: true },
+      }),
+      this.db.simbiocreacion.findMany({
+        where:  { userId: { in: userIds } },
+        select: { userId: true, privado: true, graphData: true },
+      }),
+    ]);
+
+    const byUser = new Map<string, { publicas: number; actores: number }>();
+    for (const r of rows) {
+      const acc = byUser.get(r.userId) ?? { publicas: 0, actores: 0 };
+      if (!r.privado) acc.publicas++;
+      const nodes = (r.graphData as { nodes?: { type?: string }[] } | null)?.nodes ?? [];
+      acc.actores += nodes.filter(n => n.type === 'person' || n.type === 'institution').length;
+      byUser.set(r.userId, acc);
+    }
+
     return groups.map((g, i) => ({
-      rank:    i + 1,
-      userId:  g.userId,
-      puntaje: g._count.id * 10,
-      total:   g._count.id,
-      user:    users.find(u => u.id === g.userId) ?? null,
+      rank:     i + 1,
+      userId:   g.userId,
+      total:    g._count.id,
+      publicas: byUser.get(g.userId)?.publicas ?? 0,
+      actores:  byUser.get(g.userId)?.actores ?? 0,
+      user:     users.find(u => u.id === g.userId) ?? null,
     }));
   }
 
