@@ -26,6 +26,7 @@ export const FUND_TAGS: Record<string, string> = {
   inclusion:      'Inclusión social y derechos',
   gobernanza:     'Gobernanza y transparencia',
   movilidad:      'Turismo y movilidad',
+  cultura:        'Cultura y creatividad',
   multisectorial: 'Multisectorial',
 };
 
@@ -67,7 +68,7 @@ export const SECTOR_TO_TAGS: Record<string, string[]> = {
   'Electronics':                ['tecnologia', 'circular'],
   'Automotive':                 ['movilidad', 'clima'],
   'Fashion Industry':           ['circular'],
-  'Education':                  ['educacion'],
+  'Education':                  ['educacion', 'cultura'],
   'Farmaceutical':              ['salud'],
   'Mechanics':                  ['innovacion'],
   'Leatherworking':             ['circular'],
@@ -97,7 +98,10 @@ const SPANISH_ALIASES: Record<string, string[]> = {
   'salud':                         ['salud'],
   'farmaceutica':                  ['salud'],
   'medicina':                      ['salud'],
-  'educacion':                     ['educacion'],
+  'educacion':                     ['educacion', 'cultura'],
+  'cultura':                       ['cultura'],
+  'arte':                          ['cultura'],
+  'diseno':                        ['cultura', 'innovacion'],
   'energia':                       ['energia'],
   'energia renovable':             ['energia', 'clima'],
   'energias renovables':           ['energia', 'clima'],
