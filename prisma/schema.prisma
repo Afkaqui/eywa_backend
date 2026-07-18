@@ -399,7 +399,8 @@ model Fund {
   name            String
   instrumentType  String    @map("instrument_type") // Fondo/Grant, Fellowship, Blended Finance…
   eligibleProfile String?   @map("eligible_profile")
-  sectors         String?
+  sectors         String?   // texto libre original de la matriz Neo (trazabilidad)
+  sectorTags      Json      @default("[]") @map("sector_tags") // string[] — taxonomía EYWA
   amounts         String?
   deadline        DateTime? // cierre si es una fecha concreta
   deadlineText    String?   @map("deadline_text") // "Por convocatoria", "Abierto", "Ventanilla…"

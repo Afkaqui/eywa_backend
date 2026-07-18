@@ -3,6 +3,7 @@ import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { GENES_SCALE, GENES_MAX_POINTS, GENES_CATEGORIES } from '@/lib/scoring';
+import { tagsForSector } from '@/lib/sector-tags';
 
 // KPIs REALES (2026-07-18). Reemplazan a los "Pendiente" del dashboard, que
 // esperaban datos que nadie captura (carbono, valorización USD, gap IMI).
@@ -11,12 +12,6 @@ import { GENES_SCALE, GENES_MAX_POINTS, GENES_CATEGORIES } from '@/lib/scoring';
 export const statsRouter = new Hono();
 
 statsRouter.use('*', authMiddleware);
-
-// Normaliza texto para comparar sectores (los de funds son texto libre del Excel
-// de Neo y los de organizations vienen de una lista fija).
-function norm(s: string) {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
 
 // ── GET /api/stats/me — KPIs del usuario en sesión ────────────────────────────
 statsRouter.get('/me', async (c) => {
@@ -104,18 +99,21 @@ statsRouter.get('/me', async (c) => {
     : 0;
 
   // ── Fondos que encajan con mi sector y cierran pronto ──
-  // OJO: funds.sectors es TEXTO LIBRE (Excel de Neo) y organizations.sector es lista
-  // fija → el match es APROXIMADO (coincidencia de texto). Se comunica como
-  // "podrían encajar", nunca como filtro exacto.
+  // Match EXACTO por etiquetas temáticas (2026-07-18): los fondos están etiquetados
+  // con la taxonomía EYWA y cada industria de empresa se mapea a los temas que le
+  // corresponden. Los fondos "multisectorial" aplican a todos.
   const now = new Date();
   const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
   const openFunds = await db.fund.findMany({
     where: { OR: [{ deadline: { gte: now } }, { deadline: null }] },
-    select: { id: true, name: true, sectors: true, deadline: true, scope: true },
+    select: { id: true, name: true, sectorTags: true, deadline: true, scope: true },
   });
-  const sectorWords = org?.sector ? norm(org.sector).split(/\s+/).filter(w => w.length > 4) : [];
-  const matching = sectorWords.length
-    ? openFunds.filter(f => f.sectors && sectorWords.some(w => norm(f.sectors!).includes(w)))
+  const myTags = tagsForSector(org?.sector);
+  const matching = myTags.length
+    ? openFunds.filter(f => {
+        const tags = (f.sectorTags as string[] | null) ?? [];
+        return tags.some(t => myTags.includes(t) || t === 'multisectorial');
+      })
     : [];
   const closingSoon = openFunds
     .filter(f => f.deadline && f.deadline <= in30)
