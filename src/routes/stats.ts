@@ -11,6 +11,24 @@ import { tagsForSector } from '@/lib/sector-tags';
 
 export const statsRouter = new Hono();
 
+// ── GET /api/stats/public — conteos agregados para la landing (PÚBLICO) ───────
+// Registrado ANTES del authMiddleware: la landing no tiene sesión.
+// Solo devuelve NÚMEROS AGREGADOS, nunca nombres ni datos de nadie.
+// Reemplaza a "Ecosistemas conectados / Puntos de datos por día / Millones USD
+// gestionados", que eran métricas inventadas que nadie podía calcular.
+statsRouter.get('/public', async (c) => {
+  const [organizations, diagnostics, actors, funds, certificates, documents] = await Promise.all([
+    db.organization.count(),
+    db.diagnosticResult.count(),
+    db.actor.count(),
+    db.fund.count(),
+    db.certificate.count(),
+    db.dataroomDocument.count(),
+  ]);
+
+  return c.json({ organizations, diagnostics, actors, funds, certificates, documents });
+});
+
 statsRouter.use('*', authMiddleware);
 
 // ── GET /api/stats/me — KPIs del usuario en sesión ────────────────────────────
