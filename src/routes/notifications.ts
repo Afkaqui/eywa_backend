@@ -47,5 +47,47 @@ notificationsRouter.get('/', async (c) => {
     });
   }
 
+  // ── Caso 2: sin diagnóstico ESG (teniendo organización) ────────────────────
+  if (org) {
+    const diag = await db.diagnosticResult.findFirst({
+      where: { userId: user.sub }, select: { id: true },
+    });
+    if (!diag) {
+      notices.push({
+        id:      'diagnostic-missing',
+        type:    'action',
+        title:   'Aún no tienes tu Índice ESG',
+        message: 'Completa el Diagnóstico ESG (metodología GENES) para obtener tu índice, aparecer con score ante inversionistas en el portfolio y cubrir el ítem de sostenibilidad de tu Dataroom.',
+        view:    'diagnostic',
+        cta:     'Hacer el diagnóstico',
+      });
+    }
+  }
+
+  // ── Caso 3: fondo por cerrar en los próximos 15 días ───────────────────────
+  const now = new Date();
+  const in15 = new Date(now.getTime() + 15 * 24 * 3600 * 1000);
+  const closing = await db.fund.findMany({
+    where:   { deadline: { gte: now, lte: in15 } },
+    orderBy: { deadline: 'asc' },
+    take:    3,
+    select:  { name: true, deadline: true },
+  });
+  if (closing.length) {
+    const first = closing[0];
+    const dias = Math.max(0, Math.ceil((first.deadline!.getTime() - now.getTime()) / (24 * 3600 * 1000)));
+    notices.push({
+      id:      'funds-closing',
+      type:    'info',
+      title:   closing.length === 1
+        ? 'Una convocatoria cierra pronto'
+        : `${closing.length} convocatorias cierran pronto`,
+      message: `"${first.name}" cierra en ${dias} día${dias === 1 ? '' : 's'}.` +
+               (closing.length > 1 ? ` Y ${closing.length - 1} más en los próximos 15 días.` : ''),
+      view:    'portfolio',
+      cta:     'Ver fondos',
+    });
+  }
+
   return c.json({ notifications: notices });
 });
