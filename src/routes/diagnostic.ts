@@ -23,6 +23,30 @@ diagnosticRouter.get('/results/me', async (c) => {
   return c.json({ result });
 });
 
+// ── GET /api/diagnostic/results/history ──────────────────────────────────────
+// Serie histórica del índice ESG del usuario. Sustituye al viejo esg_history
+// (panel manual, deprecado): aquí el historial es REAL, sale de cada diagnóstico.
+diagnosticRouter.get('/results/history', async (c) => {
+  const user = getRequestUser(c);
+  const results = await db.diagnosticResult.findMany({
+    where:   { userId: user.sub },
+    orderBy: { createdAt: 'asc' },
+    take:    50,
+    select:  { id: true, score: true, maxScore: true, percentage: true, level: true, createdAt: true },
+  });
+
+  return c.json({
+    history: results.map((r) => ({
+      id:         r.id,
+      score:      r.score,
+      max_score:  r.maxScore,
+      percentage: r.percentage,
+      level:      r.level,
+      created_at: r.createdAt.toISOString(),
+    })),
+  });
+});
+
 // ── POST /api/diagnostic/results ─────────────────────────────────────────────
 const resultSchema = z.object({
   score:      z.number().int().min(0),

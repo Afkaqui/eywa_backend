@@ -522,6 +522,11 @@ model Simbiocreacion {
 
 // ─── ESG Score ────────────────────────────────────────────────────────────────
 
+// ⚠️ DEPRECADO 2026-07-16 — panel ESG manual de 15 indicadores, reemplazado por
+// "el diagnóstico ES el índice" (ver EsgIndexPanel + diagnostic_results).
+// El código que lo usaba (EsgDashboard, /api/esg) ya fue eliminado. La TABLA se
+// conserva a propósito: tiene datos históricos y borrarla es irreversible.
+// No construir nada nuevo encima. Candidata a drop si nadie la extraña.
 model EsgScore {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @unique @map("user_id") @db.Uuid
@@ -534,6 +539,8 @@ model EsgScore {
   @@map("esg_scores")
 }
 
+// ⚠️ DEPRECADO 2026-07-16 — ver nota en EsgScore. El historial real del índice ESG
+// se reconstruye desde diagnostic_results (GET /api/diagnostic/results/history).
 model EsgHistory {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
