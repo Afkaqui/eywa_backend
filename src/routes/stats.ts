@@ -16,14 +16,21 @@ export const statsRouter = new Hono();
 // Solo devuelve NÚMEROS AGREGADOS, nunca nombres ni datos de nadie.
 // Reemplaza a "Ecosistemas conectados / Puntos de datos por día / Millones USD
 // gestionados", que eran métricas inventadas que nadie podía calcular.
+// Las organizaciones de DEMOSTRACIÓN no cuentan en las cifras públicas: se crean
+// para mostrar módulos con volumen en presentaciones, y contarlas inflaría los
+// números que se muestran en la landing (regla de honestidad).
+const DEMO_ORG_PREFIX = 'ORGANIZACIÓN DEMO';
+
 statsRouter.get('/public', async (c) => {
+  const notDemo = { name: { not: { startsWith: DEMO_ORG_PREFIX } } };
+
   const [organizations, diagnostics, actors, funds, certificates, documents] = await Promise.all([
-    db.organization.count(),
+    db.organization.count({ where: notDemo }),
     db.diagnosticResult.count(),
     db.actor.count(),
     db.fund.count(),
     db.certificate.count(),
-    db.dataroomDocument.count(),
+    db.dataroomDocument.count({ where: { organization: notDemo } }),
   ]);
 
   return c.json({ organizations, diagnostics, actors, funds, certificates, documents });
