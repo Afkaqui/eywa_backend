@@ -12,6 +12,12 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN}
       - UPLOAD_DIR=/app/uploads
+      # IA del Validador (opcional). Si no están definidas en .env llegan vacías,
+      # isAiConfigured() da false y el validador usa el heurístico determinista.
+      # Compatible con cualquier API estilo OpenAI (/chat/completions).
+      - VALIDATOR_AI_URL=${VALIDATOR_AI_URL:-}
+      - VALIDATOR_AI_KEY=${VALIDATOR_AI_KEY:-}
+      - VALIDATOR_AI_MODEL=${VALIDATOR_AI_MODEL:-}
     volumes:
       # Archivos del Dataroom en el DISCO DEL HOST: el auto-deploy recrea el
       # contenedor, así que dentro de él los uploads se perderían.
