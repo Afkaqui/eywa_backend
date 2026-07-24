@@ -58,6 +58,10 @@ async function callExternalAI(plan: ProjectPlan): Promise<ValidationReport> {
     headers: {
       'Content-Type':  'application/json',
       'Authorization': `Bearer ${AI_KEY}`,
+      // Explícito a propósito: proveedores detrás de Cloudflare (Groq entre ellos)
+      // responden 403 "error code: 1010" a clientes sin User-Agent reconocible.
+      // Verificado en pruebas: sin cabecera -> 403; con ella -> 200.
+      'User-Agent':    'eywa-validator/1.0',
     },
     body: JSON.stringify({
       model: AI_MODEL ?? 'default',
