@@ -19,16 +19,21 @@ export function calculatePercentage(score: number, maxScore: number): number {
 export const GENES_MAX_POINTS = 5;
 export const GENES_SCALE = 75; // escala de las bandas de clasificación
 
+// Categorías GENES (definidas por Eduardo, 2026-07-25): 5 niveles de menor a
+// mayor sobre la escala 0-75, en tramos iguales de 15 puntos.
+// Sustituyen a las 4 bandas anteriores (No cumple / Mínimamente / Parcialmente /
+// Plenamente); los cortes 31/46/61 se conservan y el antiguo 0-30 se parte en dos.
 export const GENES_BANDS = [
-  { min: 61, label: 'Cumple plenamente' },
-  { min: 46, label: 'Cumple parcialmente' },
-  { min: 31, label: 'Cumple mínimamente' },
-  { min: 0,  label: 'No cumple' },
+  { min: 61, label: 'Fénix'  },  // 61-75
+  { min: 46, label: 'Oro'    },  // 46-60
+  { min: 31, label: 'Plata'  },  // 31-45
+  { min: 16, label: 'Verde'  },  // 16-30
+  { min: 0,  label: 'Marrón' },  // 0-15
 ] as const;
 
 export function getGenesBand(genesScore: number): string {
   for (const b of GENES_BANDS) if (genesScore >= b.min) return b.label;
-  return 'No cumple';
+  return 'Marrón';
 }
 
 export const GENES_CATEGORIES: Record<string, string> = {

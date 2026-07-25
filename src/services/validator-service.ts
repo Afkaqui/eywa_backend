@@ -17,7 +17,7 @@ type PlanWithDocs = ProjectPlan & { planDocuments?: PlanDocument[] };
 export interface ValidationReport {
   overallScore:  number;           // 0-100 (derivado del ponderado GENES)
   genesScore:    number;           // 0-75  (escala de las bandas GENES)
-  band:          string;           // banda GENES ("Cumple plenamente"…)
+  band:          string;           // categoría GENES (Marrón/Verde/Plata/Oro/Fénix)
   categoryScores: {
     perfil:    number;             // 0-5 · Perfil de Emprendimiento
     ambiental: number;             // 0-5 · Ambiental

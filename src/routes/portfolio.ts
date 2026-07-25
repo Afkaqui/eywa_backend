@@ -48,7 +48,10 @@ portfolioRouter.get('/', async (c) => {
       score:      r?.percentage ?? null,
       level:      r?.level ?? null, // banda GENES
       status:     r ? 'Diagnóstico realizado' : 'Diagnóstico pendiente',
-      // riesgo derivado de la banda (escala 0-75): ≥61 bajo · ≥46 medio · <46 alto
+      // Riesgo derivado de la categoría GENES (escala 0-75):
+      // Fénix (≥61) bajo · Oro (≥46) medio · Plata/Verde/Marrón (<46) alto.
+      // Los cortes no cambian con las categorías nuevas: 61 y 46 siguen siendo
+      // límites de banda.
       risk:       r ? (r.score >= 61 ? 'bajo' : r.score >= 46 ? 'medio' : 'alto') : null,
       carbon:     null,
       trend:      null,
