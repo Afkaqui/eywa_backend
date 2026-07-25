@@ -38,3 +38,29 @@ export const GENES_CATEGORIES: Record<string, string> = {
   economico: 'Económico',
   general:   'General',
 };
+
+// Peso de cada categoría GENES (suma de los pesos de sus criterios en el cuadro
+// oficial). Suman 1.0. Se usan para ponderar los 4 promedios de categoría (0-5)
+// en un único puntaje, igual que el Diagnóstico.
+export const GENES_CATEGORY_WEIGHTS: Record<'perfil' | 'ambiental' | 'social' | 'economico', number> = {
+  perfil:    0.34,
+  ambiental: 0.16,
+  social:    0.25,
+  economico: 0.25,
+};
+
+// A partir de los 4 promedios de categoría (0-5) calcula el puntaje ponderado.
+// El puntaje NO lo decide la IA: se computa aquí con los pesos oficiales.
+export function computeGenesFromCategories(cat: {
+  perfil: number; ambiental: number; social: number; economico: number;
+}): { genesScore: number; overallScore: number; band: string } {
+  const weighted =
+    cat.perfil    * GENES_CATEGORY_WEIGHTS.perfil +
+    cat.ambiental * GENES_CATEGORY_WEIGHTS.ambiental +
+    cat.social    * GENES_CATEGORY_WEIGHTS.social +
+    cat.economico * GENES_CATEGORY_WEIGHTS.economico; // 0-5
+
+  const genesScore   = Math.round(weighted * (GENES_SCALE / GENES_MAX_POINTS)); // 0-75
+  const overallScore = Math.round((weighted / GENES_MAX_POINTS) * 100);          // 0-100
+  return { genesScore, overallScore, band: getGenesBand(genesScore) };
+}
