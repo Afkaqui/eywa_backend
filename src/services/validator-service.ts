@@ -1,5 +1,9 @@
-import type { ProjectPlan } from '@prisma/client';
+import type { ProjectPlan, PlanDocument } from '@prisma/client';
 import { computeGenesFromCategories } from '@/lib/scoring';
+import { extractPlanDocumentsText } from '@/services/document-text';
+
+// El plan que llega desde el repo trae sus documentos reales (include planDocuments).
+type PlanWithDocs = ProjectPlan & { planDocuments?: PlanDocument[] };
 
 /**
  * Reporte estructurado que produce el Validador de Proyectos.
@@ -35,6 +39,14 @@ const AI_URL   = process.env.VALIDATOR_AI_URL;    // ej: https://api.proveedor.c
 const AI_KEY   = process.env.VALIDATOR_AI_KEY;    // API key del proveedor
 const AI_MODEL = process.env.VALIDATOR_AI_MODEL;  // ej: gpt-4o, claude-..., etc.
 
+// ── Fase 3 · lectura de documentos adjuntos (CONSTRUIDA PERO DORMIDA) ────────────
+// Cuando VALIDATOR_READ_DOCS=true, antes de llamar a la IA se extrae el texto de
+// los archivos subidos al plan (PDF/Word/Excel/TXT/CSV) y se agrega al prompt.
+// La extracción la hace el backend con librerías locales; el modelo solo recibe
+// TEXTO, así que Groq (u otro modelo de texto) lo soporta sin API especial.
+// Apagado por defecto → el comportamiento actual del Validador no cambia.
+const READ_DOCS = process.env.VALIDATOR_READ_DOCS === 'true';
+
 export function isAiConfigured(): boolean {
   return Boolean(AI_URL && AI_KEY);
 }
@@ -43,10 +55,13 @@ export function isAiConfigured(): boolean {
  * Punto de entrada del análisis. Decide entre IA real o heurístico.
  * Nunca lanza: si la IA falla, cae al heurístico para no romper el flujo.
  */
-export async function analyzeProjectPlan(plan: ProjectPlan): Promise<ValidationReport> {
+export async function analyzeProjectPlan(plan: PlanWithDocs): Promise<ValidationReport> {
   if (isAiConfigured()) {
     try {
-      return await callExternalAI(plan);
+      // Fase 3 (dormida salvo VALIDATOR_READ_DOCS=true): texto de los adjuntos.
+      // Nunca rompe el flujo: si algo falla, extractPlanDocumentsText devuelve ''.
+      const docText = READ_DOCS ? await extractPlanDocumentsText(plan.planDocuments ?? []) : '';
+      return await callExternalAI(plan, docText);
     } catch (err) {
       console.error('[validator] La IA falló, usando heurístico:', err);
     }
@@ -86,10 +101,12 @@ const SYSTEM_PROMPT = [
   '  "low"|"medium"|"high", "viability": number(0-100) }.',
   'Sé concreto: las fortalezas, debilidades y recomendaciones deben referirse al',
   'proyecto analizado, no ser genéricas.',
+  'Si se incluye el contenido de documentos adjuntos, básate en ellos además de',
+  'los campos del formulario para fundamentar el puntaje y los comentarios.',
 ].join('\n');
 
-async function callExternalAI(plan: ProjectPlan): Promise<ValidationReport> {
-  const prompt = buildPrompt(plan);
+async function callExternalAI(plan: ProjectPlan, docText = ''): Promise<ValidationReport> {
+  const prompt = buildPrompt(plan, docText);
 
   const res = await fetch(AI_URL!, {
     method: 'POST',
@@ -127,7 +144,7 @@ async function callExternalAI(plan: ProjectPlan): Promise<ValidationReport> {
   return normalizeReport(parsed, 'ai');
 }
 
-function buildPrompt(plan: ProjectPlan): string {
+function buildPrompt(plan: ProjectPlan, docText = ''): string {
   return [
     `Analiza el siguiente plan de proyecto de sostenibilidad y genera el reporte ESG en JSON.`,
     ``,
@@ -139,6 +156,8 @@ function buildPrompt(plan: ProjectPlan): string {
     `Meta de reducción de CO₂: ${plan.carbonGoal} toneladas`,
     plan.objectives   ? `Objetivos: ${plan.objectives}` : '',
     plan.stakeholders ? `Stakeholders: ${plan.stakeholders}` : '',
+    // Fase 3: contenido extraído de los documentos adjuntos (solo si READ_DOCS).
+    docText ? `\nContenido de los documentos adjuntos del proyecto:\n${docText}` : '',
   ].filter(Boolean).join('\n');
 }
 

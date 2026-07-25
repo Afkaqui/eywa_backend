@@ -18,6 +18,9 @@ services:
       - VALIDATOR_AI_URL=${VALIDATOR_AI_URL:-}
       - VALIDATOR_AI_KEY=${VALIDATOR_AI_KEY:-}
       - VALIDATOR_AI_MODEL=${VALIDATOR_AI_MODEL:-}
+      # Fase 3 · lectura de documentos adjuntos (dormida). Poner "true" en .env para
+      # que la IA reciba el texto extraído de los PDFs/Word/Excel subidos al plan.
+      - VALIDATOR_READ_DOCS=${VALIDATOR_READ_DOCS:-}
     volumes:
       # Archivos del Dataroom en el DISCO DEL HOST: el auto-deploy recrea el
       # contenedor, así que dentro de él los uploads se perderían.
