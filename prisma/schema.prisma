@@ -81,6 +81,7 @@ model Profile {
   dataroomUploads     DataroomDocument[]
   dataroomGrants      DataroomAccessGrant[] @relation("DataroomGrants")
   dataroomAccessLogs  DataroomAccessLog[]   @relation("DataroomAccessLogs")
+  passwordResetTokens PasswordResetToken[]
 
 
   @@map("profiles")
@@ -597,4 +598,22 @@ model PlanDocument {
 
   @@index([planId])
   @@map("plan_documents")
+}
+
+// ─── Recuperación de contraseña ───────────────────────────────────────────────
+// El token NUNCA se guarda en claro: se almacena su SHA-256. Quien lea la base de
+// datos no puede usar los tokens para tomar cuentas; solo el correo lleva el valor
+// real. Un solo uso (usedAt) y con expiración corta.
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") // sha256 del token enviado por correo
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
