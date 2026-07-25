@@ -21,6 +21,12 @@ services:
       # Fase 3 · lectura de documentos adjuntos (dormida). Poner "true" en .env para
       # que la IA reciba el texto extraído de los PDFs/Word/Excel subidos al plan.
       - VALIDATOR_READ_DOCS=${VALIDATOR_READ_DOCS:-}
+      # Correo transaccional (Resend). Sin RESEND_API_KEY el envío queda deshabilitado.
+      # OJO: si una variable no se declara AQUÍ, no llega al contenedor aunque esté
+      # en el .env — es el fallo silencioso que ya nos pasó con VALIDATOR_AI_*.
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - MAIL_FROM=${MAIL_FROM:-}
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-}
     volumes:
       # Archivos del Dataroom en el DISCO DEL HOST: el auto-deploy recrea el
       # contenedor, así que dentro de él los uploads se perderían.
