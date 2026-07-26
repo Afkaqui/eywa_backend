@@ -260,12 +260,15 @@ statsRouter.get('/activation', async (c) => {
   return c.json({ steps, registered });
 });
 
-// ── GET /api/stats/visits — visitas a la web (gestor+) ────────────────────────
+// ── GET /api/stats/visits — visitas a la web (SOLO superadmin) ────────────────
+// Decisión del usuario (2026-07-25): el contador de visitas es exclusivo del panel
+// de superadmin. La restricción REAL vive aquí, no en el frontend: ocultar el panel
+// en la UI no impide que otro rol llame al endpoint a mano.
 // Los bots se cuentan aparte y NO entran en las cifras principales: si un
 // crawler pasa 300 veces, el número "visitas" dejaría de significar personas.
 statsRouter.get('/visits', async (c) => {
   const user = getRequestUser(c);
-  assertRole(user, ['gestor', 'admin', 'superadmin']);
+  assertRole(user, ['superadmin']);
 
   const days = Math.min(Math.max(Number(c.req.query('days') ?? 30), 1), 365);
   const since = new Date(Date.now() - days * 24 * 3600 * 1000);
