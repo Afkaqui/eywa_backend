@@ -223,6 +223,8 @@ model DiagnosticResult {
 
 model Course {
   id           String         @id @default(uuid()) @db.Uuid
+  // Clave estable para importar cursos sin duplicarlos (ver importador de cursos).
+  slug         String?        @unique
   title        String
   description  String
   category     CourseCategory @default(general)
