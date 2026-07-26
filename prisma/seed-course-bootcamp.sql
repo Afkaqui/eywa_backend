@@ -7,7 +7,7 @@ INSERT INTO courses (id, slug, title, description, category, level, duration_hou
                      instructor, lessons_count, is_published, pass_threshold, created_at, updated_at)
 VALUES (gen_random_uuid(), 'programa-desarrolladores-de-negocios-de-impacto', 'PROGRAMA DESARROLLADORES DE NEGOCIOS DE IMPACTO', 'Introducir a los estudiantes los conceptos fundamentales de la inversión de impacto y el emprendimiento social, destacando sus características, diferencias con la inversión tradicional, tendencias actuales y ejemplos inspiradores.',
         'esg'::"CourseCategory", 'basico'::"CourseLevel", 8,
-        'EYWA Academy', 2, false,
+        'EYWA Academy', 2, true,
         80, now(), now())
 ON CONFLICT (slug) DO UPDATE SET
   title = EXCLUDED.title, description = EXCLUDED.description,
@@ -29,12 +29,12 @@ INSERT INTO section_resources (id, section_id, type, title, url, sort_order)
 VALUES (gen_random_uuid(),
         (SELECT s.id FROM course_sections s JOIN courses c ON c.id = s.course_id
          WHERE c.slug = 'programa-desarrolladores-de-negocios-de-impacto' AND s.sort_order = 1),
-        'pdf', 'Guía inicial', 'https://eywa.encsust4in4ble.earth/…/guia-inicial.pdf', 0);
+        'pdf', 'GUÍA DE REFERENCIA DE FINANZAS PARA LA BIODIVERSIDAD', 'https://drive.google.com/file/d/1L0qbrvPkbrAXaAIKTjaiX5NwrGRuBVIK/view', 0);
 INSERT INTO section_resources (id, section_id, type, title, url, sort_order)
 VALUES (gen_random_uuid(),
         (SELECT s.id FROM course_sections s JOIN courses c ON c.id = s.course_id
          WHERE c.slug = 'programa-desarrolladores-de-negocios-de-impacto' AND s.sort_order = 1),
-        'link', 'Lectura recomendada', 'https://example.com/articulo', 1);
+        'pdf', 'Invertir con propósito', 'https://drive.google.com/file/d/1REfSvQAiaiUlUzaJqEJhP5uX2ClPtbUb/view', 1);
 
 INSERT INTO course_sections (id, course_id, sort_order, title, description, video_url, created_at, updated_at)
 VALUES (gen_random_uuid(), (SELECT id FROM courses WHERE slug = 'programa-desarrolladores-de-negocios-de-impacto'),
@@ -43,7 +43,7 @@ INSERT INTO section_resources (id, section_id, type, title, url, sort_order)
 VALUES (gen_random_uuid(),
         (SELECT s.id FROM course_sections s JOIN courses c ON c.id = s.course_id
          WHERE c.slug = 'programa-desarrolladores-de-negocios-de-impacto' AND s.sort_order = 2),
-        'link', 'Práctica semanal', 'https://example.com/ejercicio-semana-2', 0);
+        'link', 'Práctica semanal', 'https://eywa.com/ejercicio-semana-2', 0);
 
 -- 4. Examen final (correct_index NUNCA se envía al navegador)
 INSERT INTO exam_questions (id, course_id, sort_order, question, options, correct_index)
