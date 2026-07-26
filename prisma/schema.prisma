@@ -617,3 +617,22 @@ model PasswordResetToken {
   @@index([userId])
   @@map("password_reset_tokens")
 }
+
+// ─── Visitas a la web ─────────────────────────────────────────────────────────
+// Analítica propia y mínima. NO se guarda la IP ni el user-agent en claro: se
+// guarda un hash (IP + UA + día + secreto) que permite contar visitantes ÚNICOS
+// por día sin poder identificar a nadie ni seguirlo entre días (el hash cambia
+// cada día porque la fecha entra en la mezcla). Del referrer solo el dominio,
+// nunca la URL completa (una URL puede llevar datos en el query string).
+model SiteVisit {
+  id           String   @id @default(uuid()) @db.Uuid
+  path         String                        // ruta visitada (sin query string)
+  referrerHost String?  @map("referrer_host") // solo el dominio de origen
+  visitorHash  String   @map("visitor_hash")  // seudónimo diario, no reversible
+  isBot        Boolean  @default(false) @map("is_bot")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([visitorHash])
+  @@map("site_visits")
+}

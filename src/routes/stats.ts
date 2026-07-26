@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { createHash } from 'crypto';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
@@ -34,6 +35,63 @@ statsRouter.get('/public', async (c) => {
   ]);
 
   return c.json({ organizations, diagnostics, actors, funds, certificates, documents });
+});
+
+// ── POST /api/stats/visit — registra una visita (PÚBLICO) ─────────────────────
+// Antes del authMiddleware: la landing y las páginas públicas no tienen sesión.
+//
+// PRIVACIDAD (decisión de diseño): NO se guarda la IP ni el user-agent. Se guarda
+// un hash de (IP + UA + día + AUTH_SECRET), que permite contar visitantes ÚNICOS
+// por día sin poder identificar a nadie; como la fecha entra en la mezcla, el
+// mismo visitante genera un hash distinto cada día y no se le puede seguir en el
+// tiempo. Del referrer se guarda SOLO el dominio: una URL completa puede llevar
+// datos personales en el query string.
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|headless|lighthouse|curl|wget|python-requests|monitor|uptime/i;
+
+function visitorHashOf(ip: string, ua: string): string {
+  const day = new Date().toISOString().slice(0, 10); // rota cada día
+  return createHash('sha256')
+    .update(`${ip}|${ua}|${day}|${process.env.AUTH_SECRET ?? ''}`)
+    .digest('hex');
+}
+
+statsRouter.post('/visit', async (c) => {
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+
+  // Ruta sin query string (puede llevar tokens o datos personales) y acotada.
+  const rawPath = typeof body.path === 'string' ? body.path : '/';
+  const path = rawPath.split('?')[0].split('#')[0].slice(0, 300) || '/';
+
+  // Del referrer solo el dominio; si no parsea, se descarta.
+  let referrerHost: string | null = null;
+  if (typeof body.referrer === 'string' && body.referrer) {
+    try {
+      const h = new URL(body.referrer).hostname;
+      referrerHost = h ? h.slice(0, 200) : null;
+    } catch { /* referrer inválido → se ignora */ }
+  }
+
+  // La IP real la reenvía el proxy del frontend; si no llega, el hash sigue
+  // siendo válido (solo agrupa peor).
+  const ip = (c.req.header('x-forwarded-for') ?? '').split(',')[0].trim();
+  const ua = c.req.header('user-agent') ?? '';
+
+  try {
+    await db.siteVisit.create({
+      data: {
+        path,
+        referrerHost,
+        visitorHash: visitorHashOf(ip, ua),
+        isBot: BOT_RE.test(ua) || !ua,
+      },
+    });
+  } catch (err) {
+    // Registrar una visita NUNCA debe romperle la página a nadie.
+    console.error('[stats] no se pudo registrar la visita:', err);
+  }
+
+  // 204: no hay nada que devolver y evita payload innecesario en cada carga.
+  return c.body(null, 204);
 });
 
 statsRouter.use('*', authMiddleware);
@@ -200,4 +258,57 @@ statsRouter.get('/activation', async (c) => {
   }));
 
   return c.json({ steps, registered });
+});
+
+// ── GET /api/stats/visits — visitas a la web (gestor+) ────────────────────────
+// Los bots se cuentan aparte y NO entran en las cifras principales: si un
+// crawler pasa 300 veces, el número "visitas" dejaría de significar personas.
+statsRouter.get('/visits', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+
+  const days = Math.min(Math.max(Number(c.req.query('days') ?? 30), 1), 365);
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+  const humans = { isBot: false };
+
+  const [total, periodo, botCount, porDia, topPaths, topRefs, unicos] = await Promise.all([
+    db.siteVisit.count({ where: humans }),
+    db.siteVisit.count({ where: { ...humans, createdAt: { gte: since } } }),
+    db.siteVisit.count({ where: { isBot: true, createdAt: { gte: since } } }),
+    db.$queryRaw<{ dia: Date; visitas: bigint; unicos: bigint }[]>`
+      SELECT date_trunc('day', created_at) AS dia,
+             count(*)                      AS visitas,
+             count(DISTINCT visitor_hash)  AS unicos
+      FROM site_visits
+      WHERE is_bot = false AND created_at >= ${since}
+      GROUP BY 1 ORDER BY 1 ASC`,
+    db.siteVisit.groupBy({
+      by: ['path'], where: { ...humans, createdAt: { gte: since } },
+      _count: { path: true }, orderBy: { _count: { path: 'desc' } }, take: 10,
+    }),
+    db.siteVisit.groupBy({
+      by: ['referrerHost'],
+      where: { ...humans, createdAt: { gte: since }, referrerHost: { not: null } },
+      _count: { referrerHost: true }, orderBy: { _count: { referrerHost: 'desc' } }, take: 10,
+    }),
+    db.siteVisit.findMany({
+      where: { ...humans, createdAt: { gte: since } },
+      select: { visitorHash: true }, distinct: ['visitorHash'],
+    }),
+  ]);
+
+  return c.json({
+    days,
+    total,                       // histórico completo (personas)
+    period: periodo,             // visitas en el rango
+    unique_visitors: unicos.length,
+    bots: botCount,              // aparte, para que no inflen lo anterior
+    by_day: porDia.map(r => ({
+      day:     r.dia.toISOString().slice(0, 10),
+      visits:  Number(r.visitas),
+      unique:  Number(r.unicos),
+    })),
+    top_paths: topPaths.map(p => ({ path: p.path, visits: p._count.path })),
+    top_referrers: topRefs.map(r => ({ host: r.referrerHost, visits: r._count.referrerHost })),
+  });
 });
