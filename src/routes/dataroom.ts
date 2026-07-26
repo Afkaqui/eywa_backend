@@ -1,14 +1,19 @@
 import { Hono } from 'hono';
-import { randomUUID } from 'crypto';
+import { z } from 'zod';
+import { randomUUID, randomBytes, createHash } from 'crypto';
 import { mkdir, writeFile, readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole, ApiError } from '@/lib/auth-helpers';
 import { DataroomRepository } from '@/repositories/dataroom-repository';
+import { sendMail, baseTemplate, appUrl, isMailConfigured } from '@/lib/mailer';
 import { db } from '@/lib/db';
 
 export const dataroomRouter = new Hono();
 const repo = new DataroomRepository(db);
+
+// El token de invitación viaja solo en el correo; en la BD va su SHA-256.
+const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 
 // ══ RUTAS PÚBLICAS (sin sesión) ══════════════════════════════════════════════
 // Registradas ANTES del authMiddleware a propósito. Solo exponen lo que el dueño
@@ -28,6 +33,67 @@ dataroomRouter.get('/public/documents/:id/download', async (c) => {
 
   // Bitácora: descarga pública (sin sesión) desde la mini-landing
   await repo.logAccess({ documentId: doc.id, userId: null, action: 'download_public' });
+
+  c.header('Content-Type', doc.mime);
+  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
+  return c.body(new Uint8Array(data));
+});
+
+// ── Acceso por INVITACIÓN (sin sesión, con token del correo) ─────────────────
+// OJO: esto NO es la mini-landing. La landing muestra solo lo marcado como
+// público; el invitado ve el dataroom COMPLETO en solo lectura. Por eso el token
+// se valida en cada petición y toda descarga queda en la bitácora.
+
+// Resuelve el token a una invitación válida. Un token inexistente, revocado o
+// vencido da el MISMO error: no damos pistas sobre cuál de los tres fue.
+async function resolveInvitation(token: string) {
+  if (!token || token.length < 32) throw new ApiError(404, 'Invitación no válida o expirada');
+  const inv = await repo.findInvitationByHash(sha256(token));
+  if (!inv || inv.revokedAt || inv.expiresAt < new Date()) {
+    throw new ApiError(404, 'Invitación no válida o expirada');
+  }
+  return inv;
+}
+
+// Dataroom completo en solo lectura, para el invitado
+dataroomRouter.get('/invited/:token', async (c) => {
+  const inv = await resolveInvitation(c.req.param('token'));
+  const org = inv.organization;
+
+  await repo.touchInvitation(inv.id); // deja constancia de que lo abrió
+
+  const { folders, completeness } = await buildFolders(org);
+  return c.json({
+    organization: { id: org.id, name: org.name, sector: org.sector ?? null },
+    invited_as:   { email: inv.email, name: inv.name },
+    expires_at:   inv.expiresAt.toISOString(),
+    read_only:    true,
+    folders,
+    completeness,
+  });
+});
+
+// Descarga de un documento por parte del invitado (queda registrada a SU nombre)
+dataroomRouter.get('/invited/:token/documents/:id/download', async (c) => {
+  const inv = await resolveInvitation(c.req.param('token'));
+
+  const doc = await repo.getDocument(c.req.param('id'));
+  // El documento tiene que ser de LA organización que invitó: si no, un invitado
+  // podría pedir el id de un documento de otra empresa con su token válido.
+  if (!doc || doc.organizationId !== inv.organizationId) {
+    throw new ApiError(404, 'Documento no encontrado');
+  }
+
+  let data: Buffer;
+  try { data = await readFile(doc.storagePath); }
+  catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
+
+  await repo.logAccess({
+    documentId:   doc.id,
+    userId:       null,
+    invitationId: inv.id,
+    action:       'download_invited',
+  });
 
   c.header('Content-Type', doc.mime);
   c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
@@ -106,41 +172,10 @@ function serializeDoc(d: {
   };
 }
 
-// Resuelve la organización sobre la que se opera y valida permisos de lectura.
-// Dueño siempre; superadmin ve todo; gestor solo las que le hayan delegado.
-async function resolveOrg(userId: string, role: string) {
-  const org = await repo.getOrganizationOf(userId);
-  return { org, isSuperadmin: role === 'superadmin' };
-}
-
-// ¿Puede este usuario LEER (ver/descargar) el dataroom de esta organización?
-async function canRead(userId: string, role: string, organizationId: string): Promise<boolean> {
-  if (role === 'superadmin') return true;
-  const own = await repo.getOrganizationOf(userId);
-  if (own?.id === organizationId) return true;
-  if (['gestor', 'admin'].includes(role)) return repo.hasGrant(organizationId, userId);
-  return false;
-}
-
-// ── GET /api/dataroom ─────────────────────────────────────────────────────────
-// Plantilla + documentos + % de completitud. Sin ?orgId= opera sobre MI organización;
-// con ?orgId= permite a superadmin (todo) o gestor con permiso delegado (solo lectura).
-dataroomRouter.get('/', async (c) => {
-  const user = getRequestUser(c);
-  const ownOrg = await repo.getOrganizationOf(user.sub);
-
-  const requestedOrgId = c.req.query('orgId');
-  let org = ownOrg;
-  let readOnly = false;
-  if (requestedOrgId && requestedOrgId !== ownOrg?.id) {
-    if (!(await canRead(user.sub, user.role, requestedOrgId))) {
-      throw new ApiError(403, 'Sin acceso a este dataroom');
-    }
-    org = await repo.getOrganizationById(requestedOrgId);
-    if (!org) throw new ApiError(404, 'Organización no encontrada');
-    readOnly = true; // vista delegada: solo ver y descargar
-  }
-
+// Arma el árbol de carpetas/ítems/documentos con el % de completitud.
+// Compartido por la vista del dueño, la delegada y la del invitado, para que las
+// tres muestren EXACTAMENTE lo mismo y no se desincronicen.
+async function buildFolders(org: { id: string; userId: string } | null) {
   const folders = await repo.getTemplate();
   const docs = org ? await repo.getDocumentsOf(org.id) : [];
   // Ítems ASG completos vía plataforma (diagnóstico GENES / certificados Academia)
@@ -185,16 +220,59 @@ dataroomRouter.get('/', async (c) => {
     };
   });
 
-  return c.json({
-    has_organization: Boolean(org),
-    organization: org ? { id: org.id, name: org.name } : null,
-    read_only: readOnly,
+  return {
     folders: payload,
     completeness: {
       completed_items: completedItems,
       total_items:     totalItems,
       percentage:      totalItems ? Math.round((completedItems / totalItems) * 100) : 0,
     },
+  };
+}
+
+// Resuelve la organización sobre la que se opera y valida permisos de lectura.
+// Dueño siempre; superadmin ve todo; gestor solo las que le hayan delegado.
+async function resolveOrg(userId: string, role: string) {
+  const org = await repo.getOrganizationOf(userId);
+  return { org, isSuperadmin: role === 'superadmin' };
+}
+
+// ¿Puede este usuario LEER (ver/descargar) el dataroom de esta organización?
+async function canRead(userId: string, role: string, organizationId: string): Promise<boolean> {
+  if (role === 'superadmin') return true;
+  const own = await repo.getOrganizationOf(userId);
+  if (own?.id === organizationId) return true;
+  if (['gestor', 'admin'].includes(role)) return repo.hasGrant(organizationId, userId);
+  return false;
+}
+
+// ── GET /api/dataroom ─────────────────────────────────────────────────────────
+// Plantilla + documentos + % de completitud. Sin ?orgId= opera sobre MI organización;
+// con ?orgId= permite a superadmin (todo) o gestor con permiso delegado (solo lectura).
+dataroomRouter.get('/', async (c) => {
+  const user = getRequestUser(c);
+  const ownOrg = await repo.getOrganizationOf(user.sub);
+
+  const requestedOrgId = c.req.query('orgId');
+  let org = ownOrg;
+  let readOnly = false;
+  if (requestedOrgId && requestedOrgId !== ownOrg?.id) {
+    if (!(await canRead(user.sub, user.role, requestedOrgId))) {
+      throw new ApiError(403, 'Sin acceso a este dataroom');
+    }
+    org = await repo.getOrganizationById(requestedOrgId);
+    if (!org) throw new ApiError(404, 'Organización no encontrada');
+    readOnly = true; // vista delegada: solo ver y descargar
+  }
+
+  const { folders: payload, completeness } = await buildFolders(org);
+
+  return c.json({
+    has_organization: Boolean(org),
+    organization: org ? { id: org.id, name: org.name } : null,
+    read_only: readOnly,
+    folders: payload,
+    completeness,
   });
 });
 
@@ -432,8 +510,144 @@ dataroomRouter.get('/access-log', async (c) => {
       id:        l.id,
       file_name: l.document.fileName,
       action:    l.action,
-      user:      l.user ? (l.user.fullName || l.user.email) : 'Visitante (mini-landing pública)',
+      // Orden deliberado: usuario con cuenta → invitado → visitante anónimo.
+      // Un invitado tiene nombre y correo en la invitación: mostrarlo como
+      // "Visitante" borraría justo el rastro más sensible del dataroom.
+      user: l.user
+        ? (l.user.fullName || l.user.email)
+        : l.invitation
+          ? `${l.invitation.name || l.invitation.email} (invitado)`
+          : 'Visitante (mini-landing pública)',
       created_at: l.createdAt.toISOString(),
     })),
   });
+});
+
+// ══ INVITACIONES (solo el DUEÑO del dataroom) ════════════════════════════════
+// Un gestor con acceso delegado NO puede invitar: su permiso es de lectura, y
+// dejarle repartir accesos a documentos ajenos rompería esa regla.
+
+const INVITE_TTL_DAYS = 30;
+
+// ── GET /api/dataroom/invitations ────────────────────────────────────────────
+dataroomRouter.get('/invitations', async (c) => {
+  const user = getRequestUser(c);
+  const org = await repo.getOrganizationOf(user.sub);
+  if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
+
+  const now = new Date();
+  const list = await repo.invitationsOf(org.id);
+  return c.json({
+    invitations: list.map(i => ({
+      id:             i.id,
+      email:          i.email,
+      name:           i.name,
+      created_at:     i.createdAt.toISOString(),
+      expires_at:     i.expiresAt.toISOString(),
+      last_access_at: i.lastAccessAt?.toISOString() ?? null,
+      revoked:        Boolean(i.revokedAt),
+      // Estado ya resuelto para que la UI no reimplemente la lógica de vencimiento
+      status: i.revokedAt ? 'revocada'
+            : i.expiresAt < now ? 'vencida'
+            : i.lastAccessAt ? 'activa'
+            : 'enviada',
+    })),
+  });
+});
+
+// ── POST /api/dataroom/invitations ───────────────────────────────────────────
+const inviteSchema = z.object({
+  email: z.string().email('Correo inválido'),
+  name:  z.string().max(120).optional().nullable(),
+});
+
+dataroomRouter.post('/invitations', async (c) => {
+  const user = getRequestUser(c);
+  const org = await repo.getOrganizationOf(user.sub);
+  if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
+
+  const parsed = inviteSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos inválidos');
+
+  // Sin correo configurado la invitación sería un token que nadie recibe: se dice
+  // claro en vez de crear una fila inútil.
+  if (!isMailConfigured()) {
+    throw new ApiError(503, 'El envío de correo no está configurado. Avisa al administrador.');
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 3600 * 1000);
+
+  const inv = await repo.createInvitation({
+    organizationId: org.id,
+    email,
+    name:           parsed.data.name?.trim() || null,
+    tokenHash:      sha256(token),
+    invitedBy:      user.sub,
+    expiresAt,
+  });
+
+  const link = appUrl(`/dataroom/invitacion/${token}`);
+  const saluda = parsed.data.name ? `Hola ${parsed.data.name},` : 'Hola,';
+
+  const result = await sendMail({
+    to:      email,
+    subject: `${org.name} te invitó a revisar su dataroom en EYWA`,
+    html: baseTemplate({
+      title: `${org.name} compartió su dataroom contigo`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">${saluda}</p>
+        <p style="margin:0 0 12px;">
+          <strong>${org.name}</strong> te dio acceso a su dataroom en EYWA para que
+          revises su documentación. Podrás <strong>ver y descargar</strong> los
+          documentos, pero no modificarlos.
+        </p>
+        <p style="margin:0;">
+          El acceso vence en ${INVITE_TTL_DAYS} días y la empresa puede retirarlo
+          en cualquier momento.
+        </p>`,
+      ctaLabel: 'Abrir el dataroom',
+      ctaUrl:   link,
+      footerNote: 'Por transparencia con la empresa, cada documento que descargues queda registrado en su bitácora de accesos.',
+    }),
+    text: [
+      saluda,
+      '',
+      `${org.name} te dio acceso a su dataroom en EYWA para que revises su documentación.`,
+      `Puedes ver y descargar los documentos, pero no modificarlos. El acceso vence en ${INVITE_TTL_DAYS} días.`,
+      '',
+      link,
+      '',
+      'Por transparencia con la empresa, cada documento que descargues queda registrado en su bitácora.',
+    ].join('\n'),
+  });
+
+  if (!result.ok) {
+    // El correo no salió: la invitación es inservible, así que se revoca en vez
+    // de dejarla figurando como "enviada" en el panel del dueño.
+    await repo.revokeInvitation(inv.id);
+    throw new ApiError(502, 'No se pudo enviar el correo de invitación. Inténtalo de nuevo.');
+  }
+
+  return c.json({
+    invitation: {
+      id: inv.id, email: inv.email, name: inv.name,
+      expires_at: inv.expiresAt.toISOString(), status: 'enviada',
+    },
+  }, 201);
+});
+
+// ── DELETE /api/dataroom/invitations/:id  (revocar) ──────────────────────────
+dataroomRouter.delete('/invitations/:id', async (c) => {
+  const user = getRequestUser(c);
+  const org = await repo.getOrganizationOf(user.sub);
+  if (!org) throw new ApiError(400, 'No tienes una organización');
+
+  const inv = await repo.getInvitation(c.req.param('id'));
+  // Verificar la propiedad: si no, cualquiera podría revocar invitaciones ajenas.
+  if (!inv || inv.organizationId !== org.id) throw new ApiError(404, 'Invitación no encontrada');
+
+  await repo.revokeInvitation(inv.id);
+  return c.json({ success: true });
 });

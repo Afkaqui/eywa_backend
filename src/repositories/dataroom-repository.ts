@@ -149,7 +149,9 @@ export class DataroomRepository {
 
   // ── Bitácora de accesos ─────────────────────────────────────────────────────
 
-  async logAccess(data: { documentId: string; userId: string | null; action: string }) {
+  async logAccess(data: {
+    documentId: string; userId: string | null; action: string; invitationId?: string | null;
+  }) {
     await this.db.dataroomAccessLog.create({ data }).catch(() => {
       // la bitácora nunca debe romper una descarga
     });
@@ -161,9 +163,51 @@ export class DataroomRepository {
       orderBy: { createdAt: 'desc' },
       take:    limit,
       include: {
-        document: { select: { fileName: true } },
-        user:     { select: { email: true, fullName: true } },
+        document:   { select: { fileName: true } },
+        user:       { select: { email: true, fullName: true } },
+        // Para que una descarga de invitado no aparezca como "Visitante"
+        invitation: { select: { email: true, name: true } },
       },
     });
+  }
+
+  // ── Invitaciones ────────────────────────────────────────────────────────────
+  async createInvitation(data: {
+    organizationId: string; email: string; name: string | null;
+    tokenHash: string; invitedBy: string; expiresAt: Date;
+  }) {
+    return this.db.dataroomInvitation.create({ data });
+  }
+
+  async invitationsOf(organizationId: string) {
+    return this.db.dataroomInvitation.findMany({
+      where:   { organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getInvitation(id: string) {
+    return this.db.dataroomInvitation.findUnique({ where: { id } });
+  }
+
+  // Busca por hash del token y devuelve la organización, para la vista del invitado.
+  async findInvitationByHash(tokenHash: string) {
+    return this.db.dataroomInvitation.findUnique({
+      where:   { tokenHash },
+      include: { organization: true },
+    });
+  }
+
+  async revokeInvitation(id: string) {
+    return this.db.dataroomInvitation.update({
+      where: { id },
+      data:  { revokedAt: new Date() },
+    });
+  }
+
+  async touchInvitation(id: string) {
+    await this.db.dataroomInvitation
+      .update({ where: { id }, data: { lastAccessAt: new Date() } })
+      .catch(() => { /* registrar el acceso nunca debe romper la vista */ });
   }
 }

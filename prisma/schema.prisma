@@ -82,6 +82,7 @@ model Profile {
   dataroomGrants      DataroomAccessGrant[] @relation("DataroomGrants")
   dataroomAccessLogs  DataroomAccessLog[]   @relation("DataroomAccessLogs")
   passwordResetTokens PasswordResetToken[]
+  dataroomInvites     DataroomInvitation[] @relation("DataroomInvites")
 
 
   @@map("profiles")
@@ -385,8 +386,9 @@ model Organization {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   user      Profile               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents DataroomDocument[]
-  grants    DataroomAccessGrant[]
+  documents   DataroomDocument[]
+  grants      DataroomAccessGrant[]
+  invitations DataroomInvitation[]
 
   @@map("organizations")
 }
@@ -486,14 +488,18 @@ model DataroomAccessGrant {
 // Bitácora de accesos a documentos del dataroom (quién descargó qué y cuándo).
 // user_id NULL = descarga pública desde la mini-landing.
 model DataroomAccessLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  userId     String?  @map("user_id") @db.Uuid
-  action     String   @default("download") // download | download_public
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  documentId   String   @map("document_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  // Descarga hecha por un invitado (que no tiene cuenta): así la bitácora dice
+  // QUIÉN se llevó el documento y no solo "Visitante".
+  invitationId String?  @map("invitation_id") @db.Uuid
+  action       String   @default("download") // download | download_public | download_invited
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  document DataroomDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user     Profile?         @relation("DataroomAccessLogs", fields: [userId], references: [id], onDelete: SetNull)
+  document   DataroomDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       Profile?            @relation("DataroomAccessLogs", fields: [userId], references: [id], onDelete: SetNull)
+  invitation DataroomInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
 
   @@index([documentId])
   @@map("dataroom_access_logs")
@@ -637,4 +643,35 @@ model SiteVisit {
   @@index([createdAt])
   @@index([visitorHash])
   @@map("site_visits")
+}
+
+// ─── Invitaciones al Dataroom ─────────────────────────────────────────────────
+// El dueño invita a un tercero (inversor, auditor) a VER su dataroom.
+//
+// Decisión de diseño: el invitado NO necesita crear cuenta. En una due diligence
+// nadie se registra para revisar documentos; se abre el enlace y se revisa. A
+// cambio, el acceso es acotado y auditable: el token viaja solo en el correo (en
+// la BD va su SHA-256), vence, el dueño puede revocarlo en cualquier momento, y
+// CADA descarga queda en la bitácora atribuida a esta invitación.
+//
+// Lo que ve el invitado es el dataroom COMPLETO de esa organización en solo
+// lectura — no la mini-landing pública, que solo muestra lo marcado como público.
+model DataroomInvitation {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  email          String                              // a quién se invitó (queda en el registro)
+  name           String?                             // nombre/empresa del invitado, opcional
+  tokenHash      String    @unique @map("token_hash") // sha256 del token del enlace
+  invitedBy      String    @map("invited_by") @db.Uuid
+  expiresAt      DateTime  @map("expires_at")
+  lastAccessAt   DateTime? @map("last_access_at")    // primera señal de si lo abrieron
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      Profile             @relation("DataroomInvites", fields: [invitedBy], references: [id], onDelete: Cascade)
+  accessLogs   DataroomAccessLog[]
+
+  @@index([organizationId])
+  @@map("dataroom_invitations")
 }
