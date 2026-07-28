@@ -40,6 +40,12 @@ authRouter.post('/validate', async (c) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new ApiError(401, 'Credenciales incorrectas');
 
+  // Marca de última sesión para el panel de auditoría. No bloquea el login:
+  // si el UPDATE falla, el usuario igual entra (un dato de auditoría no puede
+  // dejar a nadie fuera de su cuenta).
+  await db.profile.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+    .catch(err => console.error('[auth] no se pudo registrar el último acceso:', err));
+
   // Devuelve solo los campos que necesita Auth.js para el JWT
   return c.json({
     id:        user.id,
@@ -103,6 +109,9 @@ authRouter.post('/login', async (c) => {
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new ApiError(401, 'Credenciales incorrectas');
+
+  await db.profile.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+    .catch(err => console.error('[auth] no se pudo registrar el último acceso:', err));
 
   const token = signToken({
     sub:   user.id,
@@ -333,7 +342,7 @@ authRouter.post('/reset-password', async (c) => {
   await db.$transaction([
     db.profile.update({
       where: { id: row.userId },
-      data:  { password: passwordHash },
+      data:  { password: passwordHash, passwordChangedAt: new Date() },
     }),
     db.passwordResetToken.updateMany({
       where: { userId: row.userId, usedAt: null },

@@ -56,7 +56,9 @@ export class ProfileRepository {
     const hash = await bcrypt.hash(newPassword, 12);
     await this.db.profile.update({
       where: { id: userId },
-      data:  { password: hash },
+      // passwordChangedAt va aparte de updatedAt: este último cambia con
+      // cualquier edición del perfil y no serviría para auditar la clave.
+      data:  { password: hash, passwordChangedAt: new Date() },
     });
     return {};
   }

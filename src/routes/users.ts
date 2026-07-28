@@ -110,3 +110,96 @@ usersRouter.post('/me/password', async (c) => {
   if (result.error) throw new ApiError(400, result.error);
   return c.json({ success: true });
 });
+
+// ── GET /api/users/audit — control y auditoría (SOLO superadmin) ──────────────
+// Reúne en una sola llamada lo que un superadmin necesita para vigilar la
+// plataforma: quién entró y cuándo, quién cambió su contraseña, quién tiene
+// acceso a documentos sensibles desde fuera, y qué se ha descargado.
+//
+// HONESTIDAD DEL DATO: `last_login_at` y `password_changed_at` empezaron a
+// registrarse el 2026-07-26. Para las cuentas anteriores llegan en null y la UI
+// dice "Sin registro" — NO se rellenan con created_at, que sería inventar un
+// dato justo en el panel donde más importa que sea cierto.
+usersRouter.get('/audit', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['superadmin']);
+
+  const logLimit = Math.min(Math.max(Number(c.req.query('logs') ?? 50), 1), 200);
+  const now = new Date();
+
+  const [profiles, orgs, logs, invitations, resetTokens] = await Promise.all([
+    db.profile.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true, email: true, fullName: true, role: true, plan: true,
+        createdAt: true, lastLoginAt: true, passwordChangedAt: true,
+        organization: { select: { id: true, name: true } },
+      },
+    }),
+    db.organization.count(),
+    // Bitácora GLOBAL: el dueño ve la suya; el superadmin ve la de todas.
+    db.dataroomAccessLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take:    logLimit,
+      include: {
+        document:   { select: { fileName: true, organization: { select: { name: true } } } },
+        user:       { select: { email: true, fullName: true } },
+        invitation: { select: { email: true, name: true } },
+      },
+    }),
+    // Accesos externos VIGENTES: gente ajena a la plataforma que ahora mismo
+    // puede abrir el dataroom de alguna empresa. Es el dato más sensible aquí.
+    db.dataroomInvitation.findMany({
+      where:   { revokedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+      include: { organization: { select: { name: true } } },
+    }),
+    // Solicitudes de recuperación de contraseña sin usar todavía
+    db.passwordResetToken.count({ where: { usedAt: null, expiresAt: { gt: now } } }),
+  ]);
+
+  return c.json({
+    // Desde cuándo son fiables los campos de sesión/contraseña
+    tracking_since: '2026-07-26',
+    summary: {
+      users:            profiles.length,
+      organizations:    orgs,
+      never_logged_in:  profiles.filter(p => !p.lastLoginAt).length,
+      staff:            profiles.filter(p => ['superadmin', 'admin', 'gestor'].includes(p.role)).length,
+      external_access:  invitations.length,
+      pending_resets:   resetTokens,
+    },
+    users: profiles.map(p => ({
+      id:                  p.id,
+      email:               p.email,
+      name:                p.fullName,
+      role:                p.role,
+      plan:                p.plan,
+      created_at:          p.createdAt.toISOString(),
+      last_login_at:       p.lastLoginAt?.toISOString() ?? null,
+      password_changed_at: p.passwordChangedAt?.toISOString() ?? null,
+      organization:        p.organization?.name ?? null,
+    })),
+    access_log: logs.map(l => ({
+      id:           l.id,
+      action:       l.action,
+      file_name:    l.document.fileName,
+      organization: l.document.organization?.name ?? null,
+      // Mismo orden que la bitácora del dueño: cuenta → invitado → anónimo
+      who: l.user
+        ? (l.user.fullName || l.user.email)
+        : l.invitation
+          ? `${l.invitation.name || l.invitation.email} (invitado)`
+          : 'Visitante (landing pública)',
+      created_at:   l.createdAt.toISOString(),
+    })),
+    external_access: invitations.map(i => ({
+      id:             i.id,
+      email:          i.email,
+      name:           i.name,
+      organization:   i.organization.name,
+      expires_at:     i.expiresAt.toISOString(),
+      last_access_at: i.lastAccessAt?.toISOString() ?? null,
+    })),
+  });
+});
