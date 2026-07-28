@@ -410,7 +410,8 @@ model Organization {
 model Fund {
   id              String    @id @default(uuid()) @db.Uuid
   scope           String    // nacional | internacional
-  name            String
+  // Único: permite que el seed haga UPSERT en vez de borrar la tabla entera.
+  name            String    @unique
   instrumentType  String    @map("instrument_type") // Fondo/Grant, Fellowship, Blended Finance…
   eligibleProfile String?   @map("eligible_profile")
   sectors         String?   // texto libre original de la matriz Neo (trazabilidad)
