@@ -1,5 +1,5 @@
 import type { PrismaClient, UserRole, UserPlan } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { hashPassword, verifyPassword } from '@/lib/password';
 
 export class ProfileRepository {
   constructor(private db: PrismaClient) {}
@@ -50,10 +50,10 @@ export class ProfileRepository {
     });
     if (!row) return { error: 'Usuario no encontrado' };
 
-    const valid = await bcrypt.compare(currentPassword, row.password);
+    const valid = await verifyPassword(currentPassword, row.password);
     if (!valid) return { error: 'La contraseña actual es incorrecta' };
 
-    const hash = await bcrypt.hash(newPassword, 12);
+    const hash = await hashPassword(newPassword);
     await this.db.profile.update({
       where: { id: userId },
       // passwordChangedAt va aparte de updatedAt: este último cambia con

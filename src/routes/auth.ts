@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import { hashPassword, verifyPassword } from '@/lib/password';
 import { randomBytes, createHash } from 'crypto';
 import { db } from '@/lib/db';
 import { signToken, ApiError } from '@/lib/auth-helpers';
@@ -37,7 +37,7 @@ authRouter.post('/validate', async (c) => {
   const user = await db.profile.findUnique({ where: { email } });
   if (!user) throw new ApiError(401, 'Credenciales incorrectas');
 
-  const valid = await bcrypt.compare(password, user.password);
+  const valid = await verifyPassword(password, user.password);
   if (!valid) throw new ApiError(401, 'Credenciales incorrectas');
 
   // Marca de última sesión para el panel de auditoría. No bloquea el login:
@@ -72,7 +72,7 @@ authRouter.post('/register', async (c) => {
   const existing = await db.profile.findUnique({ where: { email } });
   if (existing) throw new ApiError(409, 'El email ya está registrado');
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashPassword(password);
 
   const user = await db.profile.create({
     data: {
@@ -107,7 +107,7 @@ authRouter.post('/login', async (c) => {
   const user = await db.profile.findUnique({ where: { email } });
   if (!user) throw new ApiError(401, 'Credenciales incorrectas');
 
-  const valid = await bcrypt.compare(password, user.password);
+  const valid = await verifyPassword(password, user.password);
   if (!valid) throw new ApiError(401, 'Credenciales incorrectas');
 
   await db.profile.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
@@ -335,7 +335,7 @@ authRouter.post('/reset-password', async (c) => {
     throw new ApiError(400, 'El enlace no es válido o ya venció. Solicita uno nuevo.');
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashPassword(password);
 
   // Cambia la contraseña e invalida TODOS los tokens del usuario en una sola
   // transacción: si algo falla, no queda a medias.
