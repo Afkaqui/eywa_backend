@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, readFile, unlink } from 'fs/promises';
+import { mkdir, writeFile, unlink } from 'fs/promises';
+import { servirArchivo } from '@/lib/file-response';
 import path from 'path';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, ApiError } from '@/lib/auth-helpers';
@@ -49,12 +50,13 @@ mediaRouter.get('/organization/:id/logo', async (c) => {
     where: { id: c.req.param('id') }, select: { imageUrl: true },
   });
   if (!org?.imageUrl) throw new ApiError(404, 'Sin logo');
-  let data: Buffer;
-  try { data = await readFile(org.imageUrl); }
-  catch { throw new ApiError(404, 'Sin logo'); }
-  c.header('Content-Type', mimeFromPath(org.imageUrl));
-  c.header('Cache-Control', 'public, max-age=300');
-  return c.body(new Uint8Array(data));
+  // descargar:false -> el navegador la muestra en un <img> en vez de bajarla
+  const res = await servirArchivo({
+    ruta: org.imageUrl, nombre: 'logo', mime: mimeFromPath(org.imageUrl), descargar: false,
+  });
+  if (!res) throw new ApiError(404, 'Sin logo');
+  res.headers.set('Cache-Control', 'public, max-age=300');
+  return res;
 });
 
 mediaRouter.get('/profile/:id/avatar', async (c) => {
@@ -62,12 +64,12 @@ mediaRouter.get('/profile/:id/avatar', async (c) => {
     where: { id: c.req.param('id') }, select: { avatarUrl: true },
   });
   if (!p?.avatarUrl) throw new ApiError(404, 'Sin avatar');
-  let data: Buffer;
-  try { data = await readFile(p.avatarUrl); }
-  catch { throw new ApiError(404, 'Sin avatar'); }
-  c.header('Content-Type', mimeFromPath(p.avatarUrl));
-  c.header('Cache-Control', 'public, max-age=300');
-  return c.body(new Uint8Array(data));
+  const res = await servirArchivo({
+    ruta: p.avatarUrl, nombre: 'avatar', mime: mimeFromPath(p.avatarUrl), descargar: false,
+  });
+  if (!res) throw new ApiError(404, 'Sin avatar');
+  res.headers.set('Cache-Control', 'public, max-age=300');
+  return res;
 });
 
 // ══ De aquí en adelante, todo exige sesión ═══════════════════════════════════

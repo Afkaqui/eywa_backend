@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile, readFile, unlink, rm } from 'fs/promises';
+import { mkdir, writeFile, unlink, rm } from 'fs/promises';
+import { servirArchivo } from '@/lib/file-response';
 import path from 'path';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, ApiError } from '@/lib/auth-helpers';
@@ -200,13 +201,9 @@ validatorRouter.get('/plans/:id/documents/:docId/download', async (c) => {
   const doc = await validatorRepo.getDocument(docId, plan.id);
   if (!doc) throw new ApiError(404, 'Documento no encontrado');
 
-  let data: Buffer;
-  try { data = await readFile(doc.storagePath); }
-  catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
-
-  c.header('Content-Type', doc.mime);
-  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
-  return c.body(new Uint8Array(data));
+  const res = await servirArchivo({ ruta: doc.storagePath, nombre: doc.fileName, mime: doc.mime });
+  if (!res) throw new ApiError(404, 'El archivo ya no está disponible');
+  return res;
 });
 
 // ── DELETE /api/validator/plans/:id/documents/:docId ─────────────────────────

@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { randomUUID, randomBytes, createHash } from 'crypto';
-import { mkdir, writeFile, readFile, unlink } from 'fs/promises';
+import { mkdir, writeFile, unlink } from 'fs/promises';
+import { servirArchivo } from '@/lib/file-response';
 import path from 'path';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole, ApiError } from '@/lib/auth-helpers';
@@ -27,16 +28,13 @@ dataroomRouter.get('/public/documents/:id/download', async (c) => {
   const org = await repo.getOrganizationById(doc.organizationId);
   if (!org?.publicEnabled) throw new ApiError(404, 'Documento no disponible');
 
-  let data: Buffer;
-  try { data = await readFile(doc.storagePath); }
-  catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
+  const res = await servirArchivo({ ruta: doc.storagePath, nombre: doc.fileName, mime: doc.mime });
+  if (!res) throw new ApiError(404, 'El archivo ya no está disponible');
 
   // Bitácora: descarga pública (sin sesión) desde la mini-landing
   await repo.logAccess({ documentId: doc.id, userId: null, action: 'download_public' });
 
-  c.header('Content-Type', doc.mime);
-  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
-  return c.body(new Uint8Array(data));
+  return res;
 });
 
 // ── Acceso por INVITACIÓN (sin sesión, con token del correo) ─────────────────
@@ -84,9 +82,8 @@ dataroomRouter.get('/invited/:token/documents/:id/download', async (c) => {
     throw new ApiError(404, 'Documento no encontrado');
   }
 
-  let data: Buffer;
-  try { data = await readFile(doc.storagePath); }
-  catch { throw new ApiError(404, 'El archivo ya no está disponible'); }
+  const res = await servirArchivo({ ruta: doc.storagePath, nombre: doc.fileName, mime: doc.mime });
+  if (!res) throw new ApiError(404, 'El archivo ya no está disponible');
 
   await repo.logAccess({
     documentId:   doc.id,
@@ -95,9 +92,7 @@ dataroomRouter.get('/invited/:token/documents/:id/download', async (c) => {
     action:       'download_invited',
   });
 
-  c.header('Content-Type', doc.mime);
-  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
-  return c.body(new Uint8Array(data));
+  return res;
 });
 
 // Datos de la mini-landing de una empresa
@@ -326,19 +321,9 @@ dataroomRouter.get('/documents/:id/download', async (c) => {
     throw new ApiError(403, 'Sin acceso a este documento');
   }
 
-  let data: Buffer;
-  try {
-    data = await readFile(doc.storagePath);
-  } catch {
-    throw new ApiError(404, 'El archivo ya no está disponible');
-  }
-
-  // Bitácora: quién descargó qué y cuándo
-  await repo.logAccess({ documentId: doc.id, userId: user.sub, action: 'download' });
-
-  c.header('Content-Type', doc.mime);
-  c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
-  return c.body(new Uint8Array(data));
+  const res = await servirArchivo({ ruta: doc.storagePath, nombre: doc.fileName, mime: doc.mime });
+  if (!res) throw new ApiError(404, 'El archivo ya no está disponible');
+  return res;
 });
 
 // ── DELETE /api/dataroom/documents/:id ────────────────────────────────────────
