@@ -512,6 +512,7 @@ model DataroomAccessLog {
   invitation DataroomInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
 
   @@index([documentId])
+  @@index([userId])
   @@map("dataroom_access_logs")
 }
 

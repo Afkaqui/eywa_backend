@@ -1,11 +1,7 @@
-export const SCORE_THRESHOLDS = { EXCELLENT: 80, GOOD: 60, MODERATE: 40 } as const;
-
-export function getScoreLevel(percentage: number): string {
-  if (percentage >= SCORE_THRESHOLDS.EXCELLENT) return 'Excelente';
-  if (percentage >= SCORE_THRESHOLDS.GOOD)      return 'Bueno';
-  if (percentage >= SCORE_THRESHOLDS.MODERATE)  return 'Moderado';
-  return 'Inicial';
-}
+// La escala oficial de EYWA es GENES (más abajo). Aquí vivía además una escala
+// genérica (`getScoreLevel`: Excelente/Bueno/Moderado) que se contradecía con
+// ella. Se eliminó con el fix del Trust Score (2026-07-25).
+// **No reintroducir una segunda escala de calificación.**
 
 export function calculatePercentage(score: number, maxScore: number): number {
   if (maxScore === 0) return 0;

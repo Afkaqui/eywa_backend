@@ -4,8 +4,18 @@
 -- Ejecutar: docker exec -i postgres_db psql -U admin -d eywa_db < seed-diagnostic-genes.sql
 
 BEGIN;
-DELETE FROM diagnostic_results;   -- resultados de prueba (referencian preguntas viejas)
-DELETE FROM diagnostic_questions; -- cascade borra diagnostic_options
+
+-- ⚠️ NUNCA agregar aquí `DELETE FROM diagnostic_results`.
+-- Este seed lo tuvo hasta el 2026-07-28, con el comentario "resultados de prueba
+-- (referencian preguntas viejas)". Ambas cosas eran falsas:
+--   1. Ya NO son de prueba: hay diagnósticos reales de usuarios (el de Eduardo es
+--      del 2026-08-02). Son el dato más valioso de la plataforma — de ahí salen el
+--      score GENES, el índice ESG, el riesgo del Portfolio y el sello del Dataroom.
+--   2. NO hay foreign key de diagnostic_results a diagnostic_questions (verificado
+--      en information_schema): el breakdown es JSON autocontenido. Reemplazar el
+--      catálogo de preguntas NO invalida ningún resultado.
+-- Re-correr este seed actualiza el CUESTIONARIO; los resultados de la gente se quedan.
+DELETE FROM diagnostic_questions; -- catálogo GENES; cascade borra diagnostic_options
 
 WITH q AS (
   INSERT INTO diagnostic_questions (id, sort_order, category, weight, title, description, updated_at)
