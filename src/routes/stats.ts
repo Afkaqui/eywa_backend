@@ -55,7 +55,35 @@ function visitorHashOf(ip: string, ua: string): string {
     .digest('hex');
 }
 
+// ── Retención de site_visits ────────────────────────────────────────────────
+// Esta tabla guarda UNA FILA POR CADA CARGA DE PÁGINA, también de visitantes
+// anónimos: no depende de cuántos usuarios registrados haya. Con 10 000 visitas
+// diarias son ~3,6 millones de filas y ~500 MB al año — más que todo el resto de
+// la base junta.
+//
+// Se borra el detalle antiguo. NO se conservan agregados todavía porque no hay
+// tráfico que justifique la complejidad; si algún día hace falta la serie
+// histórica, hay que agregar una tabla de resúmenes ANTES de que el borrado
+// empiece a morder (a 90 días, eso es dentro de 3 meses).
+const VISITAS_RETENCION_DIAS = 90;
+let ultimaLimpieza = 0;
+
+/** Borra visitas viejas, como mucho una vez al día. No bloquea la petición. */
+function limpiarVisitasViejas() {
+  const UN_DIA = 24 * 3600 * 1000;
+  if (Date.now() - ultimaLimpieza < UN_DIA) return;
+  ultimaLimpieza = Date.now();
+
+  const corte = new Date(Date.now() - VISITAS_RETENCION_DIAS * UN_DIA);
+  // Deliberadamente sin await: registrar una visita no debe esperar a la limpieza.
+  db.siteVisit.deleteMany({ where: { createdAt: { lt: corte } } })
+    .then(r => { if (r.count) console.log(`[stats] retención: ${r.count} visitas de más de ${VISITAS_RETENCION_DIAS} días borradas`); })
+    .catch(err => console.error('[stats] falló la limpieza de visitas:', err));
+}
+
 statsRouter.post('/visit', async (c) => {
+  limpiarVisitasViejas(); // se ejecuta como mucho 1 vez al día
+
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
 
   // Ruta sin query string (puede llevar tokens o datos personales) y acotada.
