@@ -129,7 +129,7 @@ statsRouter.get('/me', async (c) => {
   const user = getRequestUser(c);
 
   const [org, lastTwo, enrollments, certificates, plans] = await Promise.all([
-    db.organization.findUnique({ where: { userId: user.sub }, select: { id: true, sector: true } }),
+    db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" }, select: { id: true, sector: true } }),
     db.diagnosticResult.findMany({
       where: { userId: user.sub }, orderBy: { createdAt: 'desc' }, take: 2,
       select: { score: true, level: true, breakdown: true, createdAt: true },

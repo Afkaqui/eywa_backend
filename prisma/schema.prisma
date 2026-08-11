@@ -77,7 +77,7 @@ model Profile {
   diagnosticQuestions DiagnosticQuestion[]
   courses             Course[]
   enrollments         CourseEnrollment[]
-  organization        Organization?
+  organizations       Organization[]  // varias personas jurídicas por usuario
   simbiocreaciones    Simbiocreacion[]
   esgScore            EsgScore?
   esgHistory          EsgHistory[]
@@ -214,7 +214,13 @@ model DiagnosticOption {
 
 model DiagnosticResult {
   id         String   @id @default(uuid()) @db.Uuid
+  // Quién lo respondió (trazabilidad). El RESULTADO es de la organización.
   userId     String   @map("user_id") @db.Uuid
+  // A qué empresa corresponde. GENES evalúa criterios de empresa (RUC, CEO mujer,
+  // insumos sostenibles), así que con varias personas jurídicas "el diagnóstico
+  // del usuario" no significa nada. Nullable por los resultados anteriores al
+  // cambio; a futuro debería ser obligatorio.
+  organizationId String? @map("organization_id") @db.Uuid
   score      Int
   maxScore   Int      @map("max_score")
   percentage Int
@@ -222,10 +228,12 @@ model DiagnosticResult {
   breakdown  Json     @default("[]")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
   @@map("diagnostic_results")
 }
 
@@ -378,10 +386,19 @@ model CourseEnrollment {
 
 model Organization {
   id              String   @id @default(uuid()) @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  type            String   @default("empresa")
+  // Ya NO es @unique: una persona puede estar detrás de VARIAS personas jurídicas
+  // (un RUC 10 propio y varios RUC 20). El límite por cuenta se hace cumplir en el
+  // backend, no en el schema, porque es una regla de negocio revisable.
+  userId          String   @map("user_id") @db.Uuid
+  // RUC peruano, 11 dígitos. 10… = persona natural con negocio · 20… = jurídica.
+  // Único global: dos cuentas no pueden reclamar la misma empresa.
+  ruc             String?  @unique
+  type            String   @default("empresa") // empresa | persona_natural | inversor…
   institutionType String?  @map("institution_type")
-  name            String
+  name            String   // razón social
+  // Nombre comercial. Aplica a AMBOS tipos: "QORY LABORATORIOS S.A.C." (razón
+  // social) opera como "Qory Lab". El RUC 10 también lo lleva.
+  tradeName       String?  @map("trade_name")
   description     String?
   phone           String?
   website         String?
@@ -395,9 +412,10 @@ model Organization {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   user      Profile               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents   DataroomDocument[]
-  grants      DataroomAccessGrant[]
-  invitations DataroomInvitation[]
+  documents         DataroomDocument[]
+  grants            DataroomAccessGrant[]
+  invitations       DataroomInvitation[]
+  diagnosticResults DiagnosticResult[]
 
   @@map("organizations")
 }

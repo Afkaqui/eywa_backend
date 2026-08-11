@@ -174,7 +174,7 @@ async function buildFolders(org: { id: string; userId: string } | null) {
   const folders = await repo.getTemplate();
   const docs = org ? await repo.getDocumentsOf(org.id) : [];
   // Ítems ASG completos vía plataforma (diagnóstico GENES / certificados Academia)
-  const platform = org ? await repo.platformCompletions(org.userId) : new Map<string, string>();
+  const platform = org ? await repo.platformCompletions(org.userId, org.id) : new Map<string, string>();
   const byItem = new Map<string, typeof docs>();
   for (const d of docs) {
     const list = byItem.get(d.itemId) ?? [];

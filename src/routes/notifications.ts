@@ -27,7 +27,7 @@ notificationsRouter.get('/', async (c) => {
 
   const [profile, org] = await Promise.all([
     db.profile.findUnique({ where: { id: user.sub }, select: { company: true } }),
-    db.organization.findUnique({ where: { userId: user.sub }, select: { id: true } }),
+    db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" }, select: { id: true } }),
   ]);
 
   const notices: Notice[] = [];

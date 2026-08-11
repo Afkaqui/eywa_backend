@@ -133,7 +133,8 @@ usersRouter.get('/audit', async (c) => {
       select: {
         id: true, email: true, fullName: true, role: true, plan: true,
         createdAt: true, lastLoginAt: true, passwordChangedAt: true,
-        organization: { select: { id: true, name: true } },
+        // Varias por usuario (§13); el panel muestra cuántas y sus nombres.
+        organizations: { select: { id: true, name: true }, orderBy: { createdAt: 'asc' } },
       },
     }),
     db.organization.count(),
@@ -178,7 +179,8 @@ usersRouter.get('/audit', async (c) => {
       created_at:          p.createdAt.toISOString(),
       last_login_at:       p.lastLoginAt?.toISOString() ?? null,
       password_changed_at: p.passwordChangedAt?.toISOString() ?? null,
-      organization:        p.organization?.name ?? null,
+      organizations:       p.organizations.map(o => o.name),
+      organization:        p.organizations[0]?.name ?? null, // compat: la predeterminada
     })),
     access_log: logs.map(l => ({
       id:           l.id,

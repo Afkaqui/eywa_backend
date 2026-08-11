@@ -3,9 +3,21 @@ import type { PrismaClient } from '@prisma/client';
 export class DataroomRepository {
   constructor(private db: PrismaClient) {}
 
-  // La organización del usuario (1:1). El dataroom cuelga de ella.
+  // Organización PREDETERMINADA del usuario: la más antigua.
+  // Un usuario puede tener varias (§13); hasta que exista el selector de
+  // organización activa, se opera sobre la primera. Con una sola es idéntico
+  // al comportamiento anterior.
   async getOrganizationOf(userId: string) {
-    return this.db.organization.findUnique({ where: { userId } });
+    return this.db.organization.findFirst({
+      where: { userId }, orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /** Todas las organizaciones del usuario (para el selector y los límites). */
+  async getOrganizationsOf(userId: string) {
+    return this.db.organization.findMany({
+      where: { userId }, orderBy: { createdAt: 'asc' },
+    });
   }
 
   async getOrganizationById(id: string) {
@@ -79,9 +91,17 @@ export class DataroomRepository {
   // - "Reporte de sostenibilidad" ← el dueño hizo el diagnóstico GENES
   // - "Certificaciones de calidad / sostenibilidad" ← certificados de la Academia
   // Devuelve Map<itemId, nota>.
-  async platformCompletions(ownerUserId: string): Promise<Map<string, string>> {
+  // El DIAGNÓSTICO se busca por ORGANIZACIÓN, no por dueño (§13): GENES evalúa a
+  // la empresa, y un dueño con tres empresas hacía que las tres mostraran el
+  // mismo resultado. Los CERTIFICADOS sí son de la persona: los obtiene quien
+  // estudia, no la empresa.
+  async platformCompletions(ownerUserId: string, organizationId?: string): Promise<Map<string, string>> {
     const [diag, certs] = await Promise.all([
-      this.db.diagnosticResult.findFirst({ where: { userId: ownerUserId }, select: { id: true } }),
+      organizationId
+        ? this.db.diagnosticResult.findFirst({ where: { organizationId }, select: { id: true } })
+        // Sin organización aún: se cae al comportamiento anterior para no romper
+        // los resultados previos a la migración, que pueden tener organization_id nulo.
+        : this.db.diagnosticResult.findFirst({ where: { userId: ownerUserId }, select: { id: true } }),
       this.db.certificate.count({ where: { userId: ownerUserId } }),
     ]);
     const wanted: { name: string; note: string }[] = [];
@@ -102,7 +122,9 @@ export class DataroomRepository {
     const [total, docs, platform] = await Promise.all([
       this.db.dataroomItem.count(),
       this.db.dataroomDocument.findMany({ where: { organizationId }, select: { itemId: true } }),
-      ownerUserId ? this.platformCompletions(ownerUserId) : Promise.resolve(new Map<string, string>()),
+      ownerUserId
+        ? this.platformCompletions(ownerUserId, organizationId)
+        : Promise.resolve(new Map<string, string>()),
     ]);
     const done = new Set([...docs.map(d => d.itemId), ...platform.keys()]).size;
     return { completed_items: done, total_items: total, percentage: total ? Math.round((done / total) * 100) : 0 };

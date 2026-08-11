@@ -15,15 +15,27 @@ type OrgData = {
 export class OrganizationRepository {
   constructor(private db: PrismaClient) {}
 
+  /** Organización predeterminada (la más antigua). Ver §13. */
   async findByUser(userId: string) {
-    return this.db.organization.findUnique({ where: { userId } });
+    return this.db.organization.findFirst({
+      where: { userId }, orderBy: { createdAt: 'asc' },
+    });
   }
 
-  async upsert(userId: string, data: OrgData) {
-    return this.db.organization.upsert({
-      where:  { userId },
-      create: { userId, ...data },
-      update: data,
+  /** Todas las del usuario, en orden estable. */
+  async findAllByUser(userId: string) {
+    return this.db.organization.findMany({
+      where: { userId }, orderBy: { createdAt: 'asc' },
     });
+  }
+
+  // Ya no se puede hacer upsert por userId (dejó de ser único). Se busca la
+  // organización predeterminada y se actualiza; si no hay ninguna, se crea.
+  async upsert(userId: string, data: OrgData) {
+    const actual = await this.findByUser(userId);
+    if (actual) {
+      return this.db.organization.update({ where: { id: actual.id }, data });
+    }
+    return this.db.organization.create({ data: { userId, ...data } });
   }
 }

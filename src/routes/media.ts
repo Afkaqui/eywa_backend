@@ -78,7 +78,7 @@ mediaRouter.use('*', authMiddleware);
 // Logo de la organización del usuario en sesión
 mediaRouter.post('/organization/logo', async (c) => {
   const user = getRequestUser(c);
-  const org = await db.organization.findUnique({ where: { userId: user.sub } });
+  const org = await db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" } });
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
 
   const { buf, ext } = await readImage(c);

@@ -41,7 +41,7 @@ fundsRouter.get('/', async (c) => {
 
   const [funds, org] = await Promise.all([
     db.fund.findMany({ orderBy: [{ deadline: 'asc' }, { name: 'asc' }] }),
-    db.organization.findUnique({ where: { userId: user.sub }, select: { sector: true } }),
+    db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" }, select: { sector: true } }),
   ]);
 
   return c.json({

@@ -21,7 +21,7 @@ portfolioRouter.get('/', async (c) => {
     // Usuarios que declararon empresa al registrarse pero no han completado
     // Mi Organización: se muestran como "Registro incompleto" (decisión 2026-07-16)
     db.profile.findMany({
-      where:  { organization: { is: null } },
+      where:  { organizations: { none: {} } },
       select: { id: true, company: true, createdAt: true, updatedAt: true },
     }),
   ]);
