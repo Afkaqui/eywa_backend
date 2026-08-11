@@ -20,12 +20,15 @@ export class DiagnosticRepository {
   }
 
   async saveResult(data: {
-    userId:     string;
-    score:      number;
-    maxScore:   number;
-    percentage: number;
-    level:      string;
-    breakdown:  object;
+    userId:         string;
+    // A qué empresa corresponde. GENES evalúa criterios de empresa, así que un
+    // usuario con tres personas jurídicas tiene tres diagnósticos distintos (§13).
+    organizationId: string | null;
+    score:          number;
+    maxScore:       number;
+    percentage:     number;
+    level:          string;
+    breakdown:      object;
   }) {
     await this.db.diagnosticResult.create({ data });
   }

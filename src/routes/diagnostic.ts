@@ -17,8 +17,23 @@ diagnosticRouter.get('/questions', async (_c) => {
 });
 
 // ── GET /api/diagnostic/results/me ───────────────────────────────────────────
+// ?orgId= devuelve el diagnóstico de ESA empresa. Sin él, el de la predeterminada.
 diagnosticRouter.get('/results/me', async (c) => {
   const user = getRequestUser(c);
+  const orgId = c.req.query('orgId');
+
+  if (orgId) {
+    // Verificar propiedad: no se puede leer el diagnóstico de una empresa ajena.
+    const propia = await db.organization.findFirst({
+      where: { id: orgId, userId: user.sub }, select: { id: true },
+    });
+    if (!propia) throw new ApiError(404, 'Organización no encontrada');
+    const result = await db.diagnosticResult.findFirst({
+      where: { organizationId: orgId }, orderBy: { createdAt: 'desc' },
+    });
+    return c.json({ result });
+  }
+
   const result = await diagnosticRepo.getLatestResult(user.sub);
   return c.json({ result });
 });
@@ -28,8 +43,11 @@ diagnosticRouter.get('/results/me', async (c) => {
 // (panel manual, deprecado): aquí el historial es REAL, sale de cada diagnóstico.
 diagnosticRouter.get('/results/history', async (c) => {
   const user = getRequestUser(c);
+  const orgIdHist = c.req.query('orgId');
   const results = await db.diagnosticResult.findMany({
-    where:   { userId: user.sub },
+    where:   orgIdHist
+      ? { organizationId: orgIdHist, user: { id: user.sub } }
+      : { userId: user.sub },
     orderBy: { createdAt: 'asc' },
     take:    50,
     select:  { id: true, score: true, maxScore: true, percentage: true, level: true, createdAt: true },
@@ -49,6 +67,9 @@ diagnosticRouter.get('/results/history', async (c) => {
 
 // ── POST /api/diagnostic/results ─────────────────────────────────────────────
 const resultSchema = z.object({
+  // Empresa a la que corresponde el diagnóstico. Opcional por compatibilidad,
+  // pero el backend verifica que sea del usuario antes de guardarla.
+  organization_id: z.string().uuid().optional().nullable(),
   score:      z.number().int().min(0),
   max_score:  z.number().int().min(0),
   percentage: z.number().int().min(0).max(100),
@@ -67,8 +88,27 @@ diagnosticRouter.post('/results', async (c) => {
   const parsed = resultSchema.safeParse(body);
   if (!parsed.success) throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos inválidos');
 
+  // Resolver la organización: la enviada (verificando que sea del usuario) o,
+  // si no viene, la predeterminada. Verificar la propiedad importa: sin esto se
+  // podría colgar un diagnóstico de la empresa de otra cuenta.
+  let organizationId: string | null = null;
+  if (parsed.data.organization_id) {
+    const propia = await db.organization.findFirst({
+      where:  { id: parsed.data.organization_id, userId: user.sub },
+      select: { id: true },
+    });
+    if (!propia) throw new ApiError(404, 'Organización no encontrada');
+    organizationId = propia.id;
+  } else {
+    const pred = await db.organization.findFirst({
+      where: { userId: user.sub }, orderBy: { createdAt: 'asc' }, select: { id: true },
+    });
+    organizationId = pred?.id ?? null;
+  }
+
   await diagnosticRepo.saveResult({
     userId:     user.sub,
+    organizationId,
     score:      parsed.data.score,
     maxScore:   parsed.data.max_score,
     percentage: parsed.data.percentage,

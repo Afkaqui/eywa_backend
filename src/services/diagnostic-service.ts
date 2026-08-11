@@ -20,13 +20,14 @@ export class DiagnosticService {
     };
   }
 
-  async saveResult(userId: string, result: DiagnosticResult): Promise<void> {
+  async saveResult(userId: string, result: DiagnosticResult, organizationId: string | null = null): Promise<void> {
     // result.score ya viene en la escala GENES (0-75); result.maxScore = 75.
     const percentage = calculatePercentage(result.score, result.maxScore);
     const level      = getGenesBand(result.score); // banda oficial GENES
 
     await this.repository.saveResult({
       userId,
+      organizationId,
       score:      result.score,
       maxScore:   result.maxScore,
       percentage,
