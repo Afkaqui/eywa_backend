@@ -128,10 +128,22 @@ statsRouter.use('*', authMiddleware);
 statsRouter.get('/me', async (c) => {
   const user = getRequestUser(c);
 
+  // El panel es de UNA empresa: la que venga en ?orgId= (verificando que sea del
+  // usuario) o la predeterminada. Sin esto mezclaba: el Trust Score salía del
+  // último diagnóstico de CUALQUIER empresa mientras la completitud del dataroom
+  // era la de la más antigua.
+  const orgPedida = c.req.query('orgId');
+  const orgFiltro = orgPedida
+    ? { id: orgPedida, userId: user.sub }
+    : { userId: user.sub };
+
   const [org, lastTwo, enrollments, certificates, plans] = await Promise.all([
-    db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" }, select: { id: true, sector: true } }),
+    db.organization.findFirst({ where: orgFiltro, orderBy: { createdAt: "asc" }, select: { id: true, sector: true } }),
     db.diagnosticResult.findMany({
-      where: { userId: user.sub }, orderBy: { createdAt: 'desc' }, take: 2,
+      where: orgPedida
+        ? { userId: user.sub, organizationId: orgPedida }
+        : { userId: user.sub },
+      orderBy: { createdAt: 'desc' }, take: 2,
       select: { score: true, level: true, breakdown: true, createdAt: true },
     }),
     db.courseEnrollment.findMany({

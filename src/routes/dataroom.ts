@@ -225,18 +225,29 @@ async function buildFolders(org: { id: string; userId: string } | null) {
   };
 }
 
-// Resuelve la organización sobre la que se opera y valida permisos de lectura.
-// Dueño siempre; superadmin ve todo; gestor solo las que le hayan delegado.
-async function resolveOrg(userId: string, role: string) {
-  const org = await repo.getOrganizationOf(userId);
-  return { org, isSuperadmin: role === 'superadmin' };
+/**
+ * Organización sobre la que opera la petición: la que venga en `?orgId=`
+ * —verificando que sea del usuario— o la predeterminada si no viene.
+ *
+ * Sin esto el dataroom trabajaba SIEMPRE sobre la organización más antigua de la
+ * cuenta: con dos empresas, los documentos de la segunda se subían a la primera.
+ */
+async function orgDeLaPeticion(c: { req: { query: (k: string) => string | undefined } }, userId: string) {
+  const pedida = c.req.query('orgId');
+  if (pedida) {
+    const propia = await db.organization.findFirst({ where: { id: pedida, userId } });
+    if (!propia) throw new ApiError(404, 'Organización no encontrada');
+    return propia;
+  }
+  return repo.getOrganizationOf(userId);
 }
 
 // ¿Puede este usuario LEER (ver/descargar) el dataroom de esta organización?
 async function canRead(userId: string, role: string, organizationId: string): Promise<boolean> {
   if (role === 'superadmin') return true;
-  const own = await repo.getOrganizationOf(userId);
-  if (own?.id === organizationId) return true;
+  // Cualquiera de SUS organizaciones, no solo la predeterminada.
+  const propia = await db.organization.findFirst({ where: { id: organizationId, userId } });
+  if (propia) return true;
   if (['gestor', 'admin'].includes(role)) return repo.hasGrant(organizationId, userId);
   return false;
 }
@@ -246,7 +257,7 @@ async function canRead(userId: string, role: string, organizationId: string): Pr
 // con ?orgId= permite a superadmin (todo) o gestor con permiso delegado (solo lectura).
 dataroomRouter.get('/', async (c) => {
   const user = getRequestUser(c);
-  const ownOrg = await repo.getOrganizationOf(user.sub);
+  const ownOrg = await orgDeLaPeticion(c, user.sub);
 
   const requestedOrgId = c.req.query('orgId');
   let org = ownOrg;
@@ -275,7 +286,7 @@ dataroomRouter.get('/', async (c) => {
 // Sube un archivo al disco del VPS y lo asocia al documento requerido.
 dataroomRouter.post('/items/:itemId/documents', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
 
   const item = await repo.getItem(c.req.param('itemId'));
@@ -332,7 +343,7 @@ dataroomRouter.delete('/documents/:id', async (c) => {
   const doc = await repo.getDocument(c.req.param('id'));
   if (!doc) throw new ApiError(404, 'Documento no encontrado');
 
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (org?.id !== doc.organizationId) throw new ApiError(403, 'Solo el dueño puede borrar');
 
   await unlink(doc.storagePath).catch(() => { /* el archivo ya no está; borra la fila igual */ });
@@ -347,7 +358,7 @@ dataroomRouter.patch('/documents/:id', async (c) => {
   const doc = await repo.getDocument(c.req.param('id'));
   if (!doc) throw new ApiError(404, 'Documento no encontrado');
 
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (org?.id !== doc.organizationId) throw new ApiError(403, 'Solo el dueño puede publicar');
 
   const body = await c.req.json().catch(() => ({}));
@@ -369,14 +380,14 @@ function slugify(name: string) {
 
 dataroomRouter.get('/landing', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
   return c.json({ enabled: org.publicEnabled, slug: org.publicSlug });
 });
 
 dataroomRouter.patch('/landing', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
 
   const body = await c.req.json().catch(() => ({}));
@@ -479,7 +490,7 @@ dataroomRouter.get('/granted', async (c) => {
 // GET /api/dataroom/access-log[?orgId=] — quién descargó qué y cuándo
 dataroomRouter.get('/access-log', async (c) => {
   const user = getRequestUser(c);
-  const ownOrg = await repo.getOrganizationOf(user.sub);
+  const ownOrg = await orgDeLaPeticion(c, user.sub);
 
   const requestedOrgId = c.req.query('orgId');
   let orgId = ownOrg?.id ?? null;
@@ -517,7 +528,7 @@ const INVITE_TTL_DAYS = 30;
 // ── GET /api/dataroom/invitations ────────────────────────────────────────────
 dataroomRouter.get('/invitations', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
 
   const now = new Date();
@@ -548,7 +559,7 @@ const inviteSchema = z.object({
 
 dataroomRouter.post('/invitations', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'Primero crea el perfil de tu organización');
 
   const parsed = inviteSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -626,7 +637,7 @@ dataroomRouter.post('/invitations', async (c) => {
 // ── DELETE /api/dataroom/invitations/:id  (revocar) ──────────────────────────
 dataroomRouter.delete('/invitations/:id', async (c) => {
   const user = getRequestUser(c);
-  const org = await repo.getOrganizationOf(user.sub);
+  const org = await orgDeLaPeticion(c, user.sub);
   if (!org) throw new ApiError(400, 'No tienes una organización');
 
   const inv = await repo.getInvitation(c.req.param('id'));

@@ -113,6 +113,17 @@ organizationRouter.get('/all', async (c) => {
   });
 });
 
+// ── GET /api/organization/:id — UNA concreta, completa ─────────────────────────
+// /all devuelve solo el resumen para el selector; el formulario de "Mi
+// Organización" necesita todos los campos de la que se esté editando.
+// Va DESPUÉS de /all a propósito: si no, /all entraría por aquí como si fuese un id.
+organizationRouter.get('/:id', async (c) => {
+  const user = getRequestUser(c);
+  const org = await db.organization.findFirst({ where: { id: c.req.param('id'), userId: user.sub } });
+  if (!org) throw new ApiError(404, 'Organización no encontrada');
+  return c.json({ organization: org });
+});
+
 // ── POST /api/organization — crear una NUEVA ───────────────────────────────────
 organizationRouter.post('/', async (c) => {
   const user = getRequestUser(c);
