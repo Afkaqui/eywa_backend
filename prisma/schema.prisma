@@ -70,6 +70,8 @@ model Profile {
   // con datos inventados para los usuarios que ya existían.
   lastLoginAt       DateTime? @map("last_login_at")
   passwordChangedAt DateTime? @map("password_changed_at")
+  // Administrador que la fijó. NULL = la cambió el propio usuario.
+  passwordChangedBy String?   @map("password_changed_by") @db.Uuid
 
   // Relaciones
   portfolioCompanies  PortfolioCompany[]
