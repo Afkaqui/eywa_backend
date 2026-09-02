@@ -24,6 +24,10 @@ services:
       # Correo transaccional (Resend). Sin RESEND_API_KEY el envío queda deshabilitado.
       # OJO: si una variable no se declara AQUÍ, no llega al contenedor aunque esté
       # en el .env — es el fallo silencioso que ya nos pasó con VALIDATOR_AI_*.
+      # MAVI / ARS LAB (§14). Sin MAVI_API_KEY el envío queda deshabilitado y la
+      # ruta responde 503 en vez de fallar a medias.
+      - MAVI_API_KEY=${MAVI_API_KEY:-}
+      - MAVI_API_URL=${MAVI_API_URL:-}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - MAIL_FROM=${MAIL_FROM:-}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-}
