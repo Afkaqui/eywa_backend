@@ -8,7 +8,11 @@ import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, ApiError } from '@/lib/auth-helpers';
 import { ValidatorRepository } from '@/repositories/validator-repository';
 import { analyzeProjectPlan } from '@/services/validator-service';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import {
+  enviarAMavi, maviConfigurado, documentosDesdeDataroom,
+} from '@/lib/mavi';
 
 export const validatorRouter = new Hono();
 const validatorRepo = new ValidatorRepository(db);
@@ -65,6 +69,19 @@ function serialize(plan: Awaited<ReturnType<ValidatorRepository['getByIdForUser'
     report:       plan.report,
     analyzedAt:   plan.analyzedAt?.toISOString() ?? null,
     createdAt:    plan.createdAt.toISOString(),
+    etapa:        plan.etapa,
+    mavi: {
+      // Si nunca se envió, todo esto va en null y la UI muestra el botón.
+      consentido:  !!plan.maviConsentAt,
+      enviado_at:  plan.maviSentAt?.toISOString() ?? null,
+      id_proyecto: plan.maviProjectId,
+      estado:      plan.maviStatus,
+      score:       plan.maviScore,
+      semaforo:    plan.maviSemaforo,
+      decision:    plan.maviDecision,
+      pendientes:  plan.maviPendientes,
+      seguimiento: plan.maviTrackingUrl,
+    },
   };
 }
 
@@ -94,6 +111,7 @@ const createSchema = z.object({
   carbonGoal:   z.number().int().min(0),
   objectives:   z.string().optional().nullable(),
   stakeholders: z.string().optional().nullable(),
+  etapa:        z.enum(['idea', 'prototipo', 'operando']).optional().nullable(),
   documents: z.array(z.object({
     name: z.string(),
     size: z.number(),
@@ -117,6 +135,7 @@ validatorRouter.post('/plans', async (c) => {
     carbonGoal:   parsed.data.carbonGoal,
     objectives:   parsed.data.objectives ?? null,
     stakeholders: parsed.data.stakeholders ?? null,
+    etapa:        parsed.data.etapa ?? null,
     documents:    parsed.data.documents ?? [],
   });
 
@@ -222,6 +241,114 @@ validatorRouter.delete('/plans/:id/documents/:docId', async (c) => {
 });
 
 // ── DELETE /api/validator/plans/:id ──────────────────────────────────────────
+// ── MAVI / ARS LAB (§14) ─────────────────────────────────────────────────────
+//
+// El envío manda a un TERCERO el nombre, correo, teléfono, organización y RUC de
+// quien presenta el proyecto. La API exige `consentimiento_datos: true` y rechaza
+// `false`, así que el consentimiento no es un detalle del formulario: es la
+// condición para que exista el envío.
+//
+// Por eso son dos pasos y no uno. Aceptar queda registrado con su fecha, y el
+// envío comprueba ese registro en vez de fiarse de un campo que venga en el body:
+// si viniera del cliente, cualquiera podría afirmarlo por el usuario.
+
+// POST /api/validator/plans/:id/mavi/consentimiento
+validatorRouter.post('/plans/:id/mavi/consentimiento', async (c) => {
+  const user = getRequestUser(c);
+  const plan = await db.projectPlan.findFirst({
+    where: { id: c.req.param('id'), userId: user.sub }, select: { id: true },
+  });
+  if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
+
+  const body = await c.req.json().catch(() => ({}));
+  const acepta = body?.acepta === true;
+
+  await db.projectPlan.update({
+    where: { id: plan.id },
+    // Retirarlo lo deja en null: deja de poder enviarse.
+    data:  { maviConsentAt: acepta ? new Date() : null },
+  });
+  return c.json({ consentido: acepta });
+});
+
+// POST /api/validator/plans/:id/mavi — enviar a la cartera de ARS
+validatorRouter.post('/plans/:id/mavi', async (c) => {
+  const user = getRequestUser(c);
+
+  if (!maviConfigurado()) {
+    throw new ApiError(503, 'La integración con MAVI no está configurada en este servidor');
+  }
+
+  const plan = await db.projectPlan.findFirst({
+    where:   { id: c.req.param('id'), userId: user.sub },
+    include: { user: { select: { email: true, fullName: true } } },
+  });
+  if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
+
+  if (!plan.maviConsentAt) {
+    throw new ApiError(400, 'Falta tu autorización para enviar estos datos a ARS LAB');
+  }
+  if (plan.maviProjectId) {
+    throw new ApiError(409, 'Este proyecto ya se envió a MAVI');
+  }
+
+  // La organización aporta los datos del solicitante. Se toma la del usuario;
+  // con varias (§13), la más antigua, que es la predeterminada en todo lo demás.
+  const org = await db.organization.findFirst({
+    where: { userId: user.sub }, orderBy: { createdAt: 'asc' },
+  });
+
+  // Qué documentos tiene cubiertos, derivado del dataroom de esa organización.
+  const docsOrg = org
+    ? await db.dataroomDocument.findMany({
+        where: { organizationId: org.id }, select: { item: { select: { name: true } } },
+      })
+    : [];
+  const cubiertos = new Set(docsOrg.map(d => d.item.name));
+
+  const r = await enviarAMavi({
+    referencia: plan.id,
+    proyecto: {
+      nombre:      plan.name,
+      descripcion: plan.description,
+      categoria:   plan.type,
+      objetivo:    plan.objectives,
+      etapa:       plan.etapa,
+      pais:        org?.country ?? null,
+      region:      null,
+    },
+    solicitante: {
+      nombre:       plan.user.fullName,
+      email:        plan.user.email,
+      telefono:     org?.phone ?? null,
+      organizacion: org?.name ?? null,
+      ruc:          org?.ruc ?? null,
+    },
+    finanzas: { presupuesto: plan.budget || null, moneda: 'USD', fuentes: null },
+    documentos: documentosDesdeDataroom(cubiertos),
+  });
+
+  if (!r.ok) throw new ApiError(r.status === 422 ? 400 : 502, r.error);
+
+  const lite = r.datos.mavii_lite ?? {};
+  const actualizado = await db.projectPlan.update({
+    where: { id: plan.id },
+    data: {
+      maviProjectId:   r.datos.id_proyecto,
+      maviStatus:      r.datos.estado,
+      maviTrackingUrl: r.datos.url_seguimiento ?? null,
+      maviScore:       lite.score ?? null,
+      maviSemaforo:    lite.semaforo ?? null,
+      maviDecision:    lite.decision_sugerida ?? null,
+      maviPendientes:  (lite.documentos_pendientes ?? []) as unknown as Prisma.InputJsonValue,
+      maviSentAt:      new Date(),
+    },
+    include: { planDocuments: true },
+  });
+
+  return c.json({ plan: serialize(actualizado) }, 201);
+});
+
 validatorRouter.delete('/plans/:id', async (c) => {
   const user = getRequestUser(c);
   const { id } = c.req.param();

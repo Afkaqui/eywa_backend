@@ -611,6 +611,20 @@ model ProjectPlan {
   status       ValidationStatus @default(pending)
   report       Json?
   analyzedAt   DateTime?        @map("analyzed_at")
+
+  // ── MAVI / ARS LAB (§14) ───────────────────────────────────────────────────
+  /// idea | prototipo | operando. Pesa en el score de MAVI.
+  etapa            String?
+  /// Cuándo aceptó enviar sus datos a ARS. NULL = no aceptó, no se puede enviar.
+  maviConsentAt    DateTime? @map("mavi_consent_at")
+  maviProjectId    String?   @unique @map("mavi_project_id")
+  maviStatus       String?   @map("mavi_status")
+  maviScore        Float?    @map("mavi_score")
+  maviSemaforo     String?   @map("mavi_semaforo")
+  maviDecision     String?   @map("mavi_decision")
+  maviPendientes   Json?     @map("mavi_pendientes")
+  maviTrackingUrl  String?   @map("mavi_tracking_url")
+  maviSentAt       DateTime? @map("mavi_sent_at")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
 

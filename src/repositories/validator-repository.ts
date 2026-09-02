@@ -10,6 +10,7 @@ export interface CreatePlanInput {
   carbonGoal:   number;
   objectives:   string | null;
   stakeholders: string | null;
+  etapa?:       string | null;
   documents:    { name: string; size: number; type: string }[];
 }
 
@@ -62,6 +63,7 @@ export class ValidatorRepository {
         carbonGoal:   data.carbonGoal,
         objectives:   data.objectives,
         stakeholders: data.stakeholders,
+        etapa:        data.etapa ?? null,
         documents:    data.documents as unknown as Prisma.InputJsonValue,
         status:       'pending',
       },
