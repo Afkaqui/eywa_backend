@@ -149,12 +149,23 @@ export async function enviarAMavi(d: DatosEnvio): Promise<ResultadoEnvio> {
 
 /**
  * Traduce los ítems del dataroom que la organización tiene cubiertos al enum de MAVI.
- * MAVI también devuelve `legal` como pendiente, pero no lo acepta de entrada.
  */
+// El enum REAL de MAVI, obtenido del propio servidor mandándole un tipo inválido:
+//   plan_negocio | modelo_financiero | estudio_mercado | legal | otros
+//
+// Se enviaban solo tres. Por eso MAVI devolvía siempre `legal` como pendiente:
+// no es que faltaran documentos legales —Qory tiene partida registral, vigencia de
+// poderes, libro de acciones y NDAs—, es que nunca se los declarábamos.
+//
+// `otros` se deja fuera a propósito: es un cajón de sastre, MAVI nunca lo ha pedido
+// como pendiente, y declararlo "disponible" no significaría nada concreto.
 export const ITEMS_POR_TIPO: Record<string, string[]> = {
   plan_negocio:      ['Descripción del modelo de negocio'],
   modelo_financiero: ['Estados financieros (anuales y trimestrales)', 'Presupuestos y proyecciones'],
   estudio_mercado:   ['Estudios de mercado y competencia'],
+  legal:             ['Testimonio de constitución y estatutos', 'Partida registral (copia literal)',
+                      'Poderes y vigencia de poderes', 'Modificaciones estatutarias',
+                      'Libros societarios', 'Convenios de accionistas / socios'],
 };
 
 export function documentosDesdeDataroom(itemsConDocumentos: Set<string>) {
