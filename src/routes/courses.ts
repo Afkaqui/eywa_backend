@@ -42,6 +42,7 @@ coursesRouter.get('/material/:archivo', async (c) => {
   const res = await servirArchivo({
     ruta:      path.join(base, 'academia', nombre),
     nombre,
+    rango:     c.req.header('range') ?? null,
     mime:      mimes[ext] ?? 'application/octet-stream',
     // Los PDF y los vídeos se abren en el navegador; el resto se descarga.
     descargar: !['.pdf', '.mp4', '.m4a', '.jpeg', '.jpg', '.png'].includes(ext),

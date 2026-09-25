@@ -20,6 +20,8 @@ export interface ArchivoServido {
   mime: string;
   /** `false` para mostrar en línea (imágenes); `true` fuerza descarga. */
   descargar?: boolean;
+  /** Cabecera Range de la petición, si la hay. Necesaria para vídeo y audio. */
+  rango?: string | null;
 }
 
 /**
@@ -37,14 +39,36 @@ export async function servirArchivo(a: ArchivoServido): Promise<Response | null>
   }
 
   const headers: Record<string, string> = {
-    'Content-Type':   a.mime,
-    'Content-Length': String(size), // permite al navegador mostrar el progreso
+    'Content-Type': a.mime,
+    // Sin esto el navegador no puede adelantar un vídeo: tendría que descargar
+    // el archivo entero antes de reproducir. Con un mp4 de 566 MB eso es inviable.
+    'Accept-Ranges': 'bytes',
   };
   headers['Content-Disposition'] = a.descargar === false
     ? `inline; filename="${encodeURIComponent(a.nombre)}"`
     : `attachment; filename="${encodeURIComponent(a.nombre)}"`;
 
-  // Readable de Node -> ReadableStream web, que es lo que acepta Response.
+  // ── Petición por rango (el reproductor pide un trozo) ───────────────────────
+  const m = /^bytes=(\d*)-(\d*)$/.exec(a.rango ?? '');
+  if (m) {
+    const inicio = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
+    const fin    = m[2] === '' || m[1] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+
+    if (Number.isNaN(inicio) || inicio < 0 || inicio > fin || inicio >= size) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+    }
+    const trozo = Readable.toWeb(
+      createReadStream(a.ruta, { start: inicio, end: fin })) as unknown as ReadableStream;
+    return new Response(trozo, {
+      status: 206,
+      headers: { ...headers,
+        'Content-Range':  `bytes ${inicio}-${fin}/${size}`,
+        'Content-Length': String(fin - inicio + 1) },
+    });
+  }
+
+  // Sin rango: el comportamiento de siempre, el archivo completo.
+  headers['Content-Length'] = String(size); // permite al navegador mostrar el progreso
   const web = Readable.toWeb(createReadStream(a.ruta)) as unknown as ReadableStream;
   return new Response(web, { headers });
 }
