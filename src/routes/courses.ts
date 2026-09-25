@@ -6,12 +6,49 @@ import { CourseRepository } from '@/repositories/course-repository';
 import { AcademyRepository } from '@/repositories/academy-repository';
 import { serializeCourse, serializeEnrollment, serializeSection } from '@/lib/serializers';
 import { db } from '@/lib/db';
+import { servirArchivo } from '@/lib/file-response';
+import path from 'path';
 
 export const coursesRouter = new Hono();
 const courseRepo  = new CourseRepository(db);
 const academyRepo = new AcademyRepository(db);
 
 coursesRouter.use('*', authMiddleware);
+
+// ── GET /api/courses/material/:archivo ───────────────────────────────────────
+// Sirve el material de las secciones desde el disco del VPS.
+//
+// Hasta ahora los recursos eran enlaces externos (Drive), que daban 401 a quien
+// no tuviera permiso en la carpeta ajena. Sirviéndolos desde aquí el acceso lo
+// decide EYWA: authMiddleware ya exige sesión para llegar a esta ruta.
+const NOMBRE_SEGURO = /^[A-Za-z0-9._-]+$/;
+
+coursesRouter.get('/material/:archivo', async (c) => {
+  const nombre = c.req.param('archivo');
+
+  // Sin esto, un nombre como "../../.env" saldría del directorio de material.
+  if (!NOMBRE_SEGURO.test(nombre) || nombre.includes('..')) {
+    throw new ApiError(400, 'Nombre de archivo inválido');
+  }
+
+  const base = process.env.UPLOAD_DIR || '/app/uploads';
+  const mimes: Record<string, string> = {
+    '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.m4a': 'audio/mp4',
+    '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.png': 'image/png',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  const ext = path.extname(nombre).toLowerCase();
+
+  const res = await servirArchivo({
+    ruta:      path.join(base, 'academia', nombre),
+    nombre,
+    mime:      mimes[ext] ?? 'application/octet-stream',
+    // Los PDF y los vídeos se abren en el navegador; el resto se descarga.
+    descargar: !['.pdf', '.mp4', '.m4a', '.jpeg', '.jpg', '.png'].includes(ext),
+  });
+  if (!res) throw new ApiError(404, 'Material no encontrado');
+  return res;
+});
 
 // ── GET /api/courses ──────────────────────────────────────────────────────────
 // Gestores ven todos; usuarios solo publicados
