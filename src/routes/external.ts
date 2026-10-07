@@ -232,9 +232,13 @@ externalRouter.post('/organizaciones', async (c) => {
   // El RUC es único en toda la plataforma: si ya lo tiene OTRA organización, no
   // se pisa ni se duplica. Puede ser la empresa registrada por su propio dueño.
   if (ruc) {
-    const conEseRuc = await db.organization.findUnique({ where: { ruc }, select: { id: true } });
+    const conEseRuc = await db.organization.findUnique({
+      where: { ruc }, select: { id: true, apiClientId: true, externalRef: true },
+    });
     if (conEseRuc && conEseRuc.id !== existente?.id) {
-      throw new ApiError(409, 'Ese RUC ya está registrado en EYWA por otra cuenta');
+      throw new ApiError(409, conEseRuc.apiClientId === cliente.id
+        ? `Ya enviaste ese RUC con otra referencia_externa ("${conEseRuc.externalRef}")`
+        : 'Ese RUC ya está registrado en EYWA por otra cuenta');
     }
   }
 
