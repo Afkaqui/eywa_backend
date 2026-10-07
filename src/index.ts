@@ -17,6 +17,7 @@ import { mediaRouter }            from '@/routes/media';
 import { fundsRouter }            from '@/routes/funds';
 import { notificationsRouter }    from '@/routes/notifications';
 import { statsRouter }            from '@/routes/stats';
+import { externalRouter }         from '@/routes/external';
 import { ApiError } from '@/lib/auth-helpers';
 
 const app = new Hono();
@@ -46,10 +47,13 @@ app.route('/api/funds',           fundsRouter);
 app.route('/api/notifications',   notificationsRouter);
 app.route('/api/stats',           statsRouter);
 
+// API para sistemas de terceros: X-Api-Key en vez de sesión (§15).
+app.route('/api/external/v1',     externalRouter);
+
 // Manejo global de errores
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json({ error: err.message }, err.status as 400 | 401 | 403 | 404 | 500);
+    return c.json({ error: err.message }, err.status as 400 | 401 | 403 | 404 | 409 | 500);
   }
   console.error('[Error]', err);
   return c.json({ error: 'Error interno del servidor' }, 500);

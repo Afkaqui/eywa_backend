@@ -94,6 +94,7 @@ model Profile {
   dataroomAccessLogs  DataroomAccessLog[]   @relation("DataroomAccessLogs")
   passwordResetTokens PasswordResetToken[]
   dataroomInvites     DataroomInvitation[] @relation("DataroomInvites")
+  apiClients          ApiClient[]          @relation("ApiClients")
 
 
   @@map("profiles")
@@ -185,6 +186,9 @@ model DiagnosticQuestion {
   sortOrder          Int      @default(0) @map("sort_order")
   category           String   @default("general") // categoría GENES: perfil | ambiental | social | economico
   weight             Float    @default(0)          // peso del criterio (los pesos GENES suman 1.0)
+  // Código estable del criterio (p. ej. "viabilidad_economica"). Es lo que usa la
+  // API externa: el id cambia si se re-siembra y el título si se corrige la redacción.
+  code               String?  @unique
   title              String
   description        String
   contextTitle       String?  @map("context_title")
@@ -413,12 +417,23 @@ model Organization {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  // ── Alta por la API externa (§15) ──
+  // Nulos para las organizaciones creadas desde la plataforma. Si vienen por la
+  // API, `externalRef` es el id que usa el SISTEMA DEL CLIENTE: es la clave de
+  // idempotencia, para que reenviar no duplique (lo contrario de lo que nos pasa
+  // con MAVI, donde cada corrección deja un registro huérfano).
+  apiClientId  String?   @map("api_client_id") @db.Uuid
+  externalRef  String?   @map("external_ref")
+  apiConsentAt DateTime? @map("api_consent_at")
+
   user      Profile               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiClient ApiClient?            @relation(fields: [apiClientId], references: [id], onDelete: SetNull)
   documents         DataroomDocument[]
   grants            DataroomAccessGrant[]
   invitations       DataroomInvitation[]
   diagnosticResults DiagnosticResult[]
 
+  @@unique([apiClientId, externalRef])
   @@map("organizations")
 }
 
@@ -719,4 +734,28 @@ model DataroomInvitation {
 
   @@index([organizationId])
   @@map("dataroom_invitations")
+}
+
+// ─── API externa (§15) ────────────────────────────────────────────────────────
+// Un cliente = un sistema de terceros con su propia clave (cabecera X-Api-Key).
+// La clave NO se guarda: solo su sha256. Si se pierde, se emite otra.
+//
+// Las organizaciones que un cliente da de alta cuelgan de `profileId`, un perfil
+// de servicio sin contraseña utilizable: Organization exige dueño, y así el
+// superadmin ve claramente de dónde vino cada empresa.
+model ApiClient {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String
+  keyPrefix        String    @map("key_prefix") // primeros caracteres, para reconocerla
+  keyHash          String    @unique @map("key_hash") // sha256 de la clave
+  profileId        String    @map("profile_id") @db.Uuid
+  active           Boolean   @default(true)
+  rateLimitPerHour Int       @default(120) @map("rate_limit_per_hour")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  lastUsedAt       DateTime? @map("last_used_at")
+
+  profile       Profile        @relation("ApiClients", fields: [profileId], references: [id], onDelete: Restrict)
+  organizations Organization[]
+
+  @@map("api_clients")
 }

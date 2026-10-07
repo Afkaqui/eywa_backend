@@ -34,11 +34,21 @@ portfolioRouter.get('/', async (c) => {
         orderBy: { createdAt: 'desc' },
       })
     : [];
-  const latest = new Map<string, (typeof results)[number]>();
-  for (const r of results) if (!latest.has(r.userId)) latest.set(r.userId, r);
+  // Último resultado POR EMPRESA. Antes se tomaba por usuario, y un usuario con
+  // varias empresas veía el mismo puntaje en todas — con la API externa (§15),
+  // donde un cliente da de alta muchas empresas bajo un solo perfil, eso hacía
+  // que todas sus empresas mostraran el puntaje de la última evaluada.
+  // Los resultados antiguos sin empresa (organizationId nulo) se siguen
+  // atribuyendo al usuario, como hasta ahora.
+  const latestByOrg  = new Map<string, (typeof results)[number]>();
+  const latestLegacy = new Map<string, (typeof results)[number]>();
+  for (const r of results) {
+    if (r.organizationId) { if (!latestByOrg.has(r.organizationId)) latestByOrg.set(r.organizationId, r); }
+    else if (!latestLegacy.has(r.userId)) latestLegacy.set(r.userId, r);
+  }
 
   const platform = orgs.map((o) => {
-    const r = latest.get(o.userId);
+    const r = latestByOrg.get(o.id) ?? latestLegacy.get(o.userId);
     return {
       id:         o.id,
       source:     'plataforma' as const,
@@ -59,6 +69,8 @@ portfolioRouter.get('/', async (c) => {
       hasLogo:    !!o.imageUrl,
       orgId:      o.id,
       publicSlug: o.publicEnabled ? o.publicSlug : null,
+      // Vino por la API externa: los datos los declaró un tercero, no el dueño.
+      viaApi:     !!o.apiClientId,
       createdAt:  o.createdAt,
       updatedAt:  o.updatedAt,
     };

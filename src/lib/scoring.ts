@@ -65,3 +65,45 @@ export function computeGenesFromCategories(cat: {
   const overallScore = Math.round((weighted / GENES_MAX_POINTS) * 100);          // 0-100
   return { genesScore, overallScore, band: getGenesBand(genesScore) };
 }
+
+// ── Cálculo GENES a partir de respuestas (servidor) ──────────────────────────
+// Réplica EXACTA de `calculateScore` en DiagnosticInterface.tsx del frontend: allí
+// se calcula el diagnóstico que hace un usuario en la plataforma; aquí, el que
+// llega por la API externa. Si cambia uno, tiene que cambiar el otro, o la misma
+// empresa obtendría puntajes distintos según por dónde entre.
+//
+// La API no acepta un puntaje ya calculado: recibe la OPCIÓN elegida en cada
+// criterio y el puntaje lo pone EYWA. Así la metodología no depende de cómo la
+// interprete cada sistema que nos alimente.
+export interface CriterioGenes {
+  code: string | null;
+  title: string;
+  category: string;
+  weight: number;
+  options: { value: string; score: number }[];
+}
+
+export function calcularGenes(criterios: CriterioGenes[], opcionPorCodigo: Map<string, string>) {
+  const pesoTotal = criterios.reduce((s, q) => s + q.weight, 0);
+  const desglose = criterios.map((q) => {
+    const sel = q.options.find((o) => o.value === opcionPorCodigo.get(q.code ?? ''));
+    return {
+      code:     q.code,
+      label:    q.title,
+      score:    sel?.score ?? 0,
+      maxScore: GENES_MAX_POINTS,
+      category: q.category,
+    };
+  });
+  const ponderado = pesoTotal > 0
+    ? criterios.reduce((s, q, i) => s + desglose[i].score * q.weight, 0) / pesoTotal // 0..5
+    : 0;
+  const score = Math.round(ponderado * (GENES_SCALE / GENES_MAX_POINTS)); // 0..75
+  return {
+    score,
+    maxScore:   GENES_SCALE,
+    percentage: calculatePercentage(score, GENES_SCALE),
+    level:      getGenesBand(score),
+    breakdown:  desglose,
+  };
+}
