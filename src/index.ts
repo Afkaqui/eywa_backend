@@ -18,6 +18,8 @@ import { fundsRouter }            from '@/routes/funds';
 import { notificationsRouter }    from '@/routes/notifications';
 import { statsRouter }            from '@/routes/stats';
 import { externalRouter }         from '@/routes/external';
+import { publicApiRouter }        from '@/routes/public-api';
+import { apiClientsRouter }       from '@/routes/api-clients';
 import { ApiError } from '@/lib/auth-helpers';
 
 const app = new Hono();
@@ -49,6 +51,10 @@ app.route('/api/stats',           statsRouter);
 
 // API para sistemas de terceros: X-Api-Key en vez de sesión (§15).
 app.route('/api/external/v1',     externalRouter);
+// Capa pública de la misma API: sin clave, solo lectura de lo que ya es público (§9).
+app.route('/api/public/v1',       publicApiRouter);
+// Emisión, rotación y revocación de claves (superadmin).
+app.route('/api/admin/api-clients', apiClientsRouter);
 
 // Manejo global de errores
 app.onError((err, c) => {

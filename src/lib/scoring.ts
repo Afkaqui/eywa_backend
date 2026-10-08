@@ -107,3 +107,14 @@ export function calcularGenes(criterios: CriterioGenes[], opcionPorCodigo: Map<s
     breakdown:  desglose,
   };
 }
+
+// ── Versión y naturaleza del resultado (PENDIENTES §9, reglas innegociables) ──
+// Un puntaje es un dictamen. Todo resultado que sale de EYWA hacia fuera lleva la
+// versión de la metodología con que se calculó y qué ES: una autoevaluación con
+// respuestas declaradas, no una calificación ni una certificación.
+// Subir la versión cuando cambien criterios, pesos, opciones o bandas.
+export const GENES_VERSION = '2026-07-25'; // última modificación: bandas Marrón…Fénix (Eduardo)
+
+export const GENES_AVISO =
+  'Puntaje preliminar calculado por EYWA con respuestas declaradas por quien las envió. ' +
+  'No es una calificación crediticia ni una certificación.';

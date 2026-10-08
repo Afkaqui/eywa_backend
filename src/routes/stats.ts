@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
+import { NO_ES_PERFIL_DE_SERVICIO } from '@/lib/api-scopes';
 import { GENES_SCALE, GENES_MAX_POINTS, GENES_CATEGORIES } from '@/lib/scoring';
 import { tagsForSector } from '@/lib/sector-tags';
 
@@ -277,7 +278,7 @@ statsRouter.get('/activation', async (c) => {
   assertRole(user, ['gestor', 'admin', 'superadmin']);
 
   const [registered, withOrg, orgIdsWithDocs, usersWithDiag, withLanding] = await Promise.all([
-    db.profile.count(),
+    db.profile.count({ where: NO_ES_PERFIL_DE_SERVICIO }),
     db.organization.count(),
     db.dataroomDocument.findMany({ select: { organizationId: true }, distinct: ['organizationId'] }),
     db.diagnosticResult.findMany({ select: { userId: true }, distinct: ['userId'] }),

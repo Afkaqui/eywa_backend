@@ -4,6 +4,7 @@ import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole, ApiError } from '@/lib/auth-helpers';
 import { PortfolioRepository } from '@/repositories/portfolio-repository';
 import { db } from '@/lib/db';
+import { NO_ES_PERFIL_DE_SERVICIO } from '@/lib/api-scopes';
 
 export const portfolioRouter = new Hono();
 const portfolioRepo = new PortfolioRepository(db);
@@ -21,7 +22,7 @@ portfolioRouter.get('/', async (c) => {
     // Usuarios que declararon empresa al registrarse pero no han completado
     // Mi Organización: se muestran como "Registro incompleto" (decisión 2026-07-16)
     db.profile.findMany({
-      where:  { organizations: { none: {} } },
+      where:  { organizations: { none: {} }, ...NO_ES_PERFIL_DE_SERVICIO },
       select: { id: true, company: true, createdAt: true, updatedAt: true },
     }),
   ]);

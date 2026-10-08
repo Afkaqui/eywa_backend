@@ -4,6 +4,7 @@ import { authMiddleware } from '@/middleware/auth';
 import { getRequestUser, assertRole, ApiError } from '@/lib/auth-helpers';
 import { ProfileRepository } from '@/repositories/profile-repository';
 import { db } from '@/lib/db';
+import { NO_ES_PERFIL_DE_SERVICIO } from '@/lib/api-scopes';
 import { hashPassword } from '@/lib/password';
 import { sendMail, baseTemplate, appUrl, isMailConfigured } from '@/lib/mailer';
 
@@ -213,6 +214,7 @@ usersRouter.get('/audit', async (c) => {
 
   const [profiles, orgs, logs, invitations, resetTokens] = await Promise.all([
     db.profile.findMany({
+      where:   NO_ES_PERFIL_DE_SERVICIO,
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, email: true, fullName: true, role: true, plan: true,

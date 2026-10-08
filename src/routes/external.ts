@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { Prisma, type DiagnosticResult, type Organization } from '@prisma/client';
-import { apiKeyMiddleware, getApiClient } from '@/middleware/api-key';
+import { apiKeyMiddleware, getApiClient, requiereScope } from '@/middleware/api-key';
 import { ApiError } from '@/lib/auth-helpers';
 import { validarRuc } from '@/lib/ruc';
-import { GENES_BANDS, GENES_SCALE, GENES_CATEGORIES, calcularGenes } from '@/lib/scoring';
+import { GENES_BANDS, GENES_SCALE, GENES_CATEGORIES, GENES_VERSION, GENES_AVISO, calcularGenes } from '@/lib/scoring';
 import { DataroomRepository } from '@/repositories/dataroom-repository';
 import { db } from '@/lib/db';
 
@@ -82,6 +82,11 @@ function serDiagnostico(r: DiagnosticResult, conDesglose: boolean) {
     porcentaje: r.percentage,
     banda:      r.level,
     fecha:      r.createdAt.toISOString(),
+    // Regla innegociable (§9): qué ES este número y con qué versión se calculó.
+    metodologia:         'GENES',
+    version_metodologia: GENES_VERSION,
+    naturaleza:          'autoevaluacion_declarada',
+    aviso:               GENES_AVISO,
     ...(conDesglose
       ? {
           desglose: (r.breakdown as unknown as Desglose[]).map((b) => ({
@@ -117,10 +122,12 @@ function serOrganizacion(o: Organization) {
 // ══ GET /criterios ═════════════════════════════════════════════════════════════
 // Qué evalúa EYWA: los 14 criterios GENES con su peso y sus opciones. Es lo que
 // el cliente necesita para saber qué datos enviar y cómo mapearlos.
-externalRouter.get('/criterios', async (c) => {
+externalRouter.get('/criterios', requiereScope('criterios:leer'), async (c) => {
   const preguntas = await criteriosGenes();
   return c.json({
     metodologia: 'GENES',
+    version:     GENES_VERSION,
+    aviso:       GENES_AVISO,
     escala:      { minimo: 0, maximo: GENES_SCALE },
     bandas:      bandas(),
     categorias:  Object.fromEntries(
@@ -168,7 +175,7 @@ const altaSchema = z.object({
   }).nullish(),
 });
 
-externalRouter.post('/organizaciones', async (c) => {
+externalRouter.post('/organizaciones', requiereScope('organizaciones:escribir'), async (c) => {
   const cliente = getApiClient(c);
 
   const cuerpo = await c.req.json().catch(() => null);
@@ -301,7 +308,7 @@ externalRouter.post('/organizaciones', async (c) => {
 
 // ══ GET /organizaciones ════════════════════════════════════════════════════════
 // Las que ESTE cliente dio de alta, con su último resultado GENES.
-externalRouter.get('/organizaciones', async (c) => {
+externalRouter.get('/organizaciones', requiereScope('organizaciones:leer'), async (c) => {
   const cliente = getApiClient(c);
   const { pagina, porPagina, skip } = paginacion(c);
 
@@ -329,7 +336,7 @@ externalRouter.get('/organizaciones', async (c) => {
 
 // ══ GET /organizaciones/:referencia ════════════════════════════════════════════
 // Detalle: datos, último diagnóstico con desglose por criterio, e historial.
-externalRouter.get('/organizaciones/:referencia', async (c) => {
+externalRouter.get('/organizaciones/:referencia', requiereScope('organizaciones:leer'), async (c) => {
   const cliente = getApiClient(c);
   const o = await db.organization.findUnique({
     where:   { apiClientId_externalRef: { apiClientId: cliente.id, externalRef: c.req.param('referencia') } },
@@ -348,7 +355,7 @@ externalRouter.get('/organizaciones/:referencia', async (c) => {
 // ══ GET /empresas ══════════════════════════════════════════════════════════════
 // Directorio de las empresas que PUBLICARON su perfil en EYWA (mini-landing
 // activa). Solo lo que esa página ya muestra en público.
-externalRouter.get('/empresas', async (c) => {
+externalRouter.get('/empresas', requiereScope('empresas:leer'), async (c) => {
   const { pagina, porPagina, skip } = paginacion(c);
   const q      = c.req.query('q')?.trim();
   const sector = c.req.query('sector')?.trim();
@@ -376,7 +383,7 @@ externalRouter.get('/empresas', async (c) => {
 });
 
 // ══ GET /empresas/:slug ════════════════════════════════════════════════════════
-externalRouter.get('/empresas/:slug', async (c) => {
+externalRouter.get('/empresas/:slug', requiereScope('empresas:leer'), async (c) => {
   const o = await db.organization.findUnique({ where: { publicSlug: c.req.param('slug') } });
   if (!o || !o.publicEnabled) throw new ApiError(404, 'Empresa no encontrada o sin perfil público');
 

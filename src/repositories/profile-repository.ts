@@ -1,5 +1,6 @@
 import type { PrismaClient, UserRole, UserPlan } from '@prisma/client';
 import { hashPassword, verifyPassword } from '@/lib/password';
+import { NO_ES_PERFIL_DE_SERVICIO } from '@/lib/api-scopes';
 
 export class ProfileRepository {
   constructor(private db: PrismaClient) {}
@@ -13,6 +14,7 @@ export class ProfileRepository {
 
   async getAll() {
     return this.db.profile.findMany({
+      where:   NO_ES_PERFIL_DE_SERVICIO,
       orderBy: { createdAt: 'desc' },
       omit:    { password: true },
     });
@@ -66,6 +68,7 @@ export class ProfileRepository {
   async search(q: string): Promise<Array<{id: string; fullName: string | null; company: string | null}>> {
     return this.db.profile.findMany({
       where: {
+        ...NO_ES_PERFIL_DE_SERVICIO,
         OR: [
           { fullName: { contains: q, mode: 'insensitive' } },
           { email:    { contains: q, mode: 'insensitive' } },

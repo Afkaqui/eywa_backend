@@ -753,6 +753,13 @@ model ApiClient {
   rateLimitPerHour Int       @default(120) @map("rate_limit_per_hour")
   createdAt        DateTime  @default(now()) @map("created_at")
   lastUsedAt       DateTime? @map("last_used_at")
+  // Permisos de la clave (ver lib/api-scopes.ts). Una ruta sin su permiso da 403.
+  scopes           Json      @default("[\"criterios:leer\",\"organizaciones:escribir\",\"organizaciones:leer\",\"empresas:leer\"]")
+  revokedAt        DateTime? @map("revoked_at")
+  createdBy        String?   @map("created_by") @db.Uuid // superadmin que la emitió
+  // Peticiones atendidas. Se acumula en memoria y se vuelca como mucho una vez por
+  // minuto: escribir en la BD en cada petición sería una escritura por lectura.
+  requestCount     Int       @default(0) @map("request_count")
 
   profile       Profile        @relation("ApiClients", fields: [profileId], references: [id], onDelete: Restrict)
   organizations Organization[]
