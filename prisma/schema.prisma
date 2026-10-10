@@ -456,10 +456,39 @@ model Fund {
   deadlineText    String?   @map("deadline_text") // "Por convocatoria", "Abierto", "Ventanilla…"
   checklist       String?   // evidencia Gate 0
   url             String?
+
+  // ── Re-verificación automática (PENDIENTES §16) ──
+  // Lo escribe el job nocturno (src/jobs/verificar-fondos.ts). Lo automático
+  // PROPONE: la fecha solo se aplica si es inequívoca; lo dudoso va a revisión.
+  verifyStatus     String?   @map("verify_status") // vigente | cerrado | enlace_roto | bloqueado | sin_datos | error
+  verifiedAt       DateTime? @map("verified_at")
+  verifyHttp       Int?      @map("verify_http")
+  detectedDeadline DateTime? @map("detected_deadline")
+  detectedEvidence String?   @map("detected_evidence") // fragmento de la página del que salió la fecha
+  deadlineSource   String?   @map("deadline_source") // manual | bot (NULL = carga original)
+  needsReview      Boolean   @default(false) @map("needs_review")
+  reviewReason     String?   @map("review_reason")
+  dismissedDetection String? @map("dismissed_detection") // lo ya descartado por un gestor; no se re-propone
+
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("funds")
+}
+
+// Historial de corridas del job de fondos: qué revisó y qué pasó.
+model FundSyncRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  kind       String // verificacion | descubrimiento
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  checked    Int       @default(0)
+  updated    Int       @default(0)
+  flagged    Int       @default(0)
+  errors     Int       @default(0)
+  summary    Json      @default("{}")
+
+  @@map("fund_sync_runs")
 }
 
 // ─── Dataroom ─────────────────────────────────────────────────────────────────

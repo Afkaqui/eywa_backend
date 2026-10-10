@@ -62,6 +62,10 @@ fundsRouter.get('/', async (c) => {
       deadline_text:    f.deadlineText,
       checklist:        f.checklist,
       url:              f.url,
+      // Re-verificación nocturna (§16): cuándo se comprobó y de dónde salió la fecha.
+      verify_status:    f.verifyStatus,
+      verified_at:      f.verifiedAt ? f.verifiedAt.toISOString() : null,
+      deadline_source:  f.deadlineSource, // manual | bot | null (carga original)
     })),
   });
 });
@@ -99,6 +103,81 @@ function toFundData(d: z.infer<typeof fundSchema>) {
   };
 }
 
+// ══ Cola de revisión del job nocturno (gestor/admin/superadmin) ═════════════════
+// El bot PROPONE (fechas nuevas, enlaces rotos, enlaces de LinkedIn); un gestor
+// decide. Ver src/jobs/verificar-fondos.ts.
+
+// GET /api/funds/revision
+fundsRouter.get('/revision', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+
+  const [pendientes, ultima] = await Promise.all([
+    db.fund.findMany({ where: { needsReview: true }, orderBy: [{ detectedDeadline: 'asc' }, { name: 'asc' }] }),
+    db.fundSyncRun.findFirst({ where: { kind: 'verificacion' }, orderBy: { startedAt: 'desc' } }),
+  ]);
+
+  return c.json({
+    ultima_corrida: ultima ? {
+      inicio:     ultima.startedAt.toISOString(),
+      fin:        ultima.finishedAt?.toISOString() ?? null,
+      revisados:  ultima.checked,
+      marcados:   ultima.flagged,
+      errores:    ultima.errors,
+      resumen:    ultima.summary,
+    } : null,
+    pendientes: pendientes.map((f) => ({
+      id:                f.id,
+      name:              f.name,
+      url:               f.url,
+      deadline:          f.deadline?.toISOString() ?? null,
+      deadline_text:     f.deadlineText,
+      verify_status:     f.verifyStatus,
+      verify_http:       f.verifyHttp,
+      verified_at:       f.verifiedAt?.toISOString() ?? null,
+      detected_deadline: f.detectedDeadline?.toISOString() ?? null,
+      detected_evidence: f.detectedEvidence,
+      review_reason:     f.reviewReason,
+    })),
+  });
+});
+
+// POST /api/funds/:id/revision  { accion: 'aceptar_fecha' | 'descartar' }
+const revisionSchema = z.object({ accion: z.enum(['aceptar_fecha', 'descartar']) });
+
+fundsRouter.post('/:id/revision', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+  const parsed = revisionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, 'Acción inválida');
+
+  const f = await db.fund.findUnique({ where: { id: c.req.param('id') } });
+  if (!f) throw new ApiError(404, 'Fondo no encontrado');
+  if (!f.needsReview) throw new ApiError(409, 'Este fondo ya no tiene nada pendiente de revisión');
+
+  if (parsed.data.accion === 'aceptar_fecha') {
+    if (!f.detectedDeadline) throw new ApiError(409, 'No hay una fecha propuesta que aceptar');
+    await db.fund.update({
+      where: { id: f.id },
+      data: {
+        deadline: f.detectedDeadline, deadlineText: null, deadlineSource: 'bot',
+        needsReview: false, reviewReason: null, dismissedDetection: null,
+      },
+    });
+  } else {
+    // Se recuerda QUÉ se descartó para que el bot no lo proponga de nuevo mañana.
+    const clave = f.verifyStatus === 'enlace_roto' ? 'enlace_roto'
+      : f.url && /lnkd\.in|linkedin\.com/i.test(f.url) ? 'linkedin'
+      : f.detectedDeadline ? `fecha:${f.detectedDeadline.toISOString().slice(0, 10)}`
+      : null;
+    await db.fund.update({
+      where: { id: f.id },
+      data: { needsReview: false, reviewReason: null, dismissedDetection: clave },
+    });
+  }
+  return c.json({ success: true });
+});
+
 // POST /api/funds
 fundsRouter.post('/', async (c) => {
   const user = getRequestUser(c);
@@ -126,7 +205,19 @@ fundsRouter.patch('/:id', async (c) => {
   }
 
   try {
-    await db.fund.update({ where: { id: c.req.param('id') }, data: toFundData(parsed.data) });
+    // Una edición humana resuelve lo que hubiera pendiente: si corrigió la URL o la
+    // fecha, la próxima verificación partirá de lo nuevo.
+    const actual = await db.fund.findUnique({ where: { id: c.req.param('id') }, select: { deadline: true } });
+    const datos = toFundData(parsed.data);
+    const cambioFecha = (actual?.deadline?.getTime() ?? null) !== (datos.deadline?.getTime() ?? null);
+    await db.fund.update({
+      where: { id: c.req.param('id') },
+      data: {
+        ...datos,
+        ...(cambioFecha ? { deadlineSource: 'manual' } : {}),
+        needsReview: false, reviewReason: null, dismissedDetection: null,
+      },
+    });
   } catch {
     throw new ApiError(404, 'Fondo no encontrado');
   }
