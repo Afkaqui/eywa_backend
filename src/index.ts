@@ -20,6 +20,10 @@ import { statsRouter }            from '@/routes/stats';
 import { externalRouter }         from '@/routes/external';
 import { publicApiRouter }        from '@/routes/public-api';
 import { apiClientsRouter }       from '@/routes/api-clients';
+import { agroRouter }             from '@/routes/agro';
+import { serveStatic }            from '@hono/node-server/serve-static';
+import { readFileSync }           from 'node:fs';
+import path                       from 'node:path';
 import { ApiError } from '@/lib/auth-helpers';
 
 const app = new Hono();
@@ -27,6 +31,20 @@ const app = new Hono();
 // Middlewares globales
 app.use('*', logger());
 app.use('*', corsMiddleware);
+
+// ── Vertical AGRO: agro.encsust4in4ble.earth ──────────────────────────────────
+// nginx del VPS manda ese host aquí. Todo lo que no es /api se sirve desde
+// agro-web/ (app ligera, sin build), y cualquier ruta de la app cae en index.html
+// para que /p/LT-XXXX (pasaporte público, QR) funcione con enlace directo.
+const AGRO_DIR = path.resolve(process.cwd(), 'agro-web');
+const esAgro = (host?: string) => /^agro\./i.test(host ?? '');
+app.use('*', async (c, next) => {
+  if (!esAgro(c.req.header('host')) || c.req.path.startsWith('/api/')) return next();
+  return serveStatic({ root: path.relative(process.cwd(), AGRO_DIR) })(c, async () => {
+    c.header('Content-Type', 'text/html; charset=utf-8');
+    c.res = c.body(readFileSync(path.join(AGRO_DIR, 'index.html'), 'utf8'));
+  });
+});
 
 // Health check
 app.get('/', (c) => c.json({ status: 'ok', service: 'EYWA API', version: '1.0.0' }));
@@ -55,6 +73,7 @@ app.route('/api/external/v1',     externalRouter);
 app.route('/api/public/v1',       publicApiRouter);
 // Emisión, rotación y revocación de claves (superadmin).
 app.route('/api/admin/api-clients', apiClientsRouter);
+app.route('/api/agro',            agroRouter);
 
 // Manejo global de errores
 app.onError((err, c) => {

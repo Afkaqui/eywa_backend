@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EYWA Agro · Trazabilidad</title>
+<link rel="icon" href="/logo.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f9fafb; }
+  .inp { width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .5rem .75rem; font-size: .875rem; background: #fff; }
+  .inp:focus { outline: 2px solid #10b981; outline-offset: 0; }
+  .btn { background: #059669; color: #fff; border-radius: .5rem; padding: .5rem 1rem; font-size: .875rem; font-weight: 600; }
+  .btn:hover { background: #047857; } .btn:disabled { opacity: .5; }
+  .btn2 { border: 1px solid #e5e7eb; border-radius: .5rem; padding: .375rem .75rem; font-size: .75rem; font-weight: 500; color: #374151; background: #fff; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1.25rem; }
+  th { text-align: left; font-size: .7rem; text-transform: uppercase; color: #6b7280; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
+  td { padding: .5rem; border-bottom: 1px solid #f3f4f6; font-size: .85rem; vertical-align: top; }
+</style>
+</head>
+<body class="text-gray-800">
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <a href="/" class="flex items-center gap-2">
+      <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain">
+      <span class="leading-tight"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
+      <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
+    </a>
+    <nav id="nav" class="ml-auto flex gap-1 text-sm"></nav>
+  </div>
+</header>
+<main id="app" class="max-w-6xl mx-auto px-4 py-6"></main>
+
+<script>
+// ══ EYWA Agro — trazabilidad de lotes, acopio digital y pasaporte ══════════════
+// Misma cuenta que EYWA. El token se guarda en sessionStorage (se cierra con la
+// pestaña). Los textos que vienen del servidor se insertan siempre escapados.
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = (n, d = 0) => (n == null ? '—' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: d }));
+const hoy = () => new Date().toISOString().slice(0, 10);
+let token = null; try { token = sessionStorage.getItem('agro_token'); } catch {}
+
+async function api(ruta, opt = {}) {
+  const r = await fetch('/api' + ruta, {
+    method: opt.method || 'GET',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: opt.body ? JSON.stringify(opt.body) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && token) { salir(); throw new Error('Tu sesión expiró'); }
+  if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
+  return d;
+}
+function salir() { token = null; try { sessionStorage.removeItem('agro_token'); } catch {} ; ir('/'); }
+function ir(ruta) { history.pushState({}, '', ruta); render(); }
+window.addEventListener('popstate', render);
+document.addEventListener('click', (e) => { const a = e.target.closest('a[data-ir]'); if (a) { e.preventDefault(); ir(a.getAttribute('href')); } });
+
+function nav() {
+  const items = token ? [['/', 'Panel'], ['/productores', 'Productores'], ['/lotes', 'Lotes'], ['/acopio', 'Acopio']] : [];
+  $('#nav').innerHTML = items.map(([h, t]) => `<a data-ir href="${h}" class="px-3 py-1.5 rounded-full ${location.pathname === h ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}">${t}</a>`).join('')
+    + (token ? '<button id="salir" class="px-3 py-1.5 text-gray-500 hover:text-gray-800">Salir</button>' : '');
+  const s = $('#salir'); if (s) s.onclick = salir;
+}
+function aviso(msg, tipo = 'error') {
+  return `<div class="mb-4 text-sm rounded-lg p-3 ${tipo === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}">${esc(msg)}</div>`;
+}
+function datosForm(f) {
+  const o = {};
+  for (const el of f.elements) {
+    if (!el.name) continue;
+    if (el.type === 'checkbox') o[el.name] = el.checked;
+    else if (el.value === '') o[el.name] = null;
+    else o[el.name] = el.dataset.num !== undefined ? Number(el.value) : el.value;
+  }
+  return o;
+}
+
+async function render() {
+  nav();
+  const p = location.pathname, app = $('#app');
+  const pub = p.match(/^\/p\/((LT|SC)-[0-9A-F]{8})$/i);
+  if (pub) return pasaporte(app, pub[1].toUpperCase());
+  if (!token) return login(app);
+  try {
+    if (p === '/productores') return await productores(app);
+    if (p === '/lotes') return await lotes(app);
+    if (p === '/acopio') return await acopio(app);
+    return await panel(app);
+  } catch (e) { app.innerHTML = aviso(e.message); }
+}
+
+// ── Login (cuenta EYWA) ──
+function login(app) {
+  app.innerHTML = `
+  <div class="max-w-md mx-auto card mt-8">
+    <h1 class="text-xl font-semibold mb-1">Trazabilidad agro</h1>
+    <p class="text-sm text-gray-500 mb-5">Lotes georreferenciados, centro de acopio digital y pasaporte de cada saco. Entra con tu cuenta de EYWA.</p>
+    <div id="msg"></div>
+    <form id="f" class="space-y-3">
+      <input class="inp" name="email" type="email" placeholder="Correo" required autocomplete="username">
+      <input class="inp" name="password" type="password" placeholder="Contraseña" required autocomplete="current-password">
+      <button class="btn w-full">Entrar</button>
+    </form>
+    <p class="text-xs text-gray-400 mt-4">¿Sin cuenta? Regístrate en <a class="text-emerald-700 underline" href="https://eywa.encsust4in4ble.earth">EYWA</a>.</p>
+  </div>`;
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const d = await api('/auth/login', { method: 'POST', body: datosForm(e.target) });
+      token = d.token; try { sessionStorage.setItem('agro_token', token); } catch {}
+      ir('/');
+    } catch (err) { $('#msg').innerHTML = aviso(err.message); }
+  };
+}
+
+// ── Panel ──
+async function panel(app) {
+  const r = await api('/agro/resumen');
+  const kpi = (t, v, s = '') => `<div class="card"><div class="text-2xl font-light">${v}</div><div class="text-xs uppercase tracking-wider text-gray-500">${t}</div>${s ? `<div class="text-xs text-gray-400 mt-1">${s}</div>` : ''}</div>`;
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-5">Panel de trazabilidad</h1>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    ${kpi('Productores', num(r.productores))}
+    ${kpi('Lotes', num(r.lotes), num(r.hectareas, 2) + ' ha')}
+    ${kpi('Georreferenciados', `${num(r.lotes_georreferenciados)} / ${num(r.lotes)}`, `${num(r.lotes_con_declaracion)} con declaración de no deforestación`)}
+    ${kpi('Acopiado', num(r.kilos_acopiados) + ' kg', 'Pagado a productores: USD ' + num(r.pagado_productores, 2))}
+  </div>
+  <div class="card text-sm text-gray-600">
+    <p class="font-medium text-gray-800 mb-2">Cómo funciona</p>
+    <ol class="list-decimal ml-5 space-y-1">
+      <li>Registra a cada <b>productor</b> y sus <b>lotes</b> con coordenadas (requisito del reglamento europeo contra la deforestación).</li>
+      <li>Anota las <b>cosechas</b> de cada lote.</li>
+      <li>En el <b>acopio</b>, cada saco entregado recibe un código y un QR: es su pasaporte.</li>
+      <li>Al vender, registra la fecha y el precio de referencia: queda calculado lo que le corresponde al productor según el % pactado, y cuándo se le pagó.</li>
+    </ol>
+    <p class="text-xs text-gray-400 mt-3">La "no deforestación" es una declaración del productor con fecha; aún no hay verificación satelital.</p>
+  </div>`;
+}
+
+// ── Productores ──
+async function productores(app, msg = '') {
+  const { productores: ps } = await api('/agro/productores');
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-5">Productores</h1>${msg}
+  <div class="grid md:grid-cols-3 gap-4">
+    <form id="f" class="card space-y-3 h-fit">
+      <div class="font-medium">Nuevo productor</div>
+      <input class="inp" name="nombre" placeholder="Nombre completo" required>
+      <input class="inp" name="dni" placeholder="DNI (privado)">
+      <input class="inp" name="comunidad" placeholder="Comunidad / asociación">
+      <input class="inp" name="telefono" placeholder="Teléfono (privado)">
+      <button class="btn w-full">Guardar</button>
+      <p class="text-[11px] text-gray-400">El DNI, el teléfono y el nombre completo nunca aparecen en el pasaporte público.</p>
+    </form>
+    <div class="card md:col-span-2 overflow-x-auto">
+      ${ps.length ? `<table class="w-full"><tr><th>Nombre</th><th>Comunidad</th><th>Lotes</th><th></th></tr>
+        ${ps.map((p) => `<tr><td>${esc(p.nombre)}<div class="text-xs text-gray-400">${esc(p.dni || '')}</div></td><td>${esc(p.comunidad || '—')}</td><td>${p.lotes}</td>
+        <td class="text-right"><button class="btn2" data-del="${p.id}">Eliminar</button></td></tr>`).join('')}</table>`
+        : '<p class="text-sm text-gray-500">Aún no hay productores.</p>'}
+    </div>
+  </div>`;
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/agro/productores', { method: 'POST', body: datosForm(e.target) }); await productores(app, aviso('Productor guardado', 'ok')); }
+    catch (err) { await productores(app, aviso(err.message)); }
+  };
+  app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+    if (!confirm('¿Eliminar al productor con todos sus lotes, cosechas y entregas?')) return;
+    try { await api('/agro/productores/' + b.dataset.del, { method: 'DELETE' }); await productores(app); } catch (err) { alert(err.message); }
+  });
+}
+
+// ── Lotes ──
+async function lotes(app, msg = '') {
+  const [{ productores: ps }, { lotes: ls }] = await Promise.all([api('/agro/productores'), api('/agro/lotes')]);
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-5">Lotes</h1>${msg}
+  ${!ps.length ? aviso('Primero registra un productor.', 'ok') : `
+  <form id="f" class="card mb-5 grid md:grid-cols-4 gap-3">
+    <div class="md:col-span-4 font-medium">Nuevo lote</div>
+    <select class="inp" name="productor_id" required>${ps.map((p) => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('')}</select>
+    <input class="inp" name="nombre" placeholder="Nombre del lote" required>
+    <input class="inp" name="cultivo" placeholder="Cultivo (cacao)">
+    <input class="inp" name="variedad" placeholder="Variedad (CCN-51, nativo…)">
+    <input class="inp" name="hectareas" data-num type="number" step="0.01" min="0" placeholder="Hectáreas">
+    <input class="inp" name="departamento" placeholder="Departamento">
+    <input class="inp" name="provincia" placeholder="Provincia">
+    <input class="inp" name="distrito" placeholder="Distrito">
+    <input class="inp" name="latitud" data-num type="number" step="any" placeholder="Latitud (ej. -8.3791)">
+    <input class="inp" name="longitud" data-num type="number" step="any" placeholder="Longitud (ej. -74.5539)">
+    <button type="button" id="gps" class="btn2">Usar mi ubicación (GPS)</button>
+    <label class="md:col-span-4 flex gap-2 items-start text-sm"><input type="checkbox" name="sin_deforestacion" class="mt-1 accent-emerald-600">
+      <span>El productor declara que este lote <b>no proviene de deforestación</b> posterior al 31-12-2020. Queda registrado como declaración con fecha.</span></label>
+    <button class="btn md:col-span-1">Guardar lote</button>
+  </form>`}
+  <div class="card overflow-x-auto">
+    ${ls.length ? `<table class="w-full"><tr><th>Lote</th><th>Productor</th><th>Ubicación</th><th>ha</th><th>Cosechado</th><th>Pasaporte</th><th></th></tr>
+    ${ls.map((l) => `<tr>
+      <td>${esc(l.nombre)}<div class="text-xs text-gray-400">${esc(l.cultivo)} ${esc(l.variedad || '')}</div></td>
+      <td>${esc(l.productor)}</td>
+      <td>${esc([l.distrito, l.provincia].filter(Boolean).join(', ') || '—')}
+        <div class="text-xs ${l.latitud != null ? 'text-emerald-700' : 'text-amber-700'}">${l.latitud != null ? '✓ georreferenciado' : 'sin coordenadas'}</div>
+        <div class="text-xs ${l.sin_deforestacion ? 'text-emerald-700' : 'text-gray-400'}">${l.sin_deforestacion ? '✓ declaración no deforestación' : 'sin declaración'}</div></td>
+      <td>${num(l.hectareas, 2)}</td>
+      <td>${num(l.kilos_cosechados)} kg</td>
+      <td><a class="text-emerald-700 underline text-xs" href="/p/${esc(l.codigo)}" target="_blank">${esc(l.codigo)}</a></td>
+      <td class="text-right whitespace-nowrap"><button class="btn2" data-cos="${l.id}">+ Cosecha</button> <button class="btn2" data-del="${l.id}">Eliminar</button></td>
+    </tr>`).join('')}</table>` : '<p class="text-sm text-gray-500">Aún no hay lotes.</p>'}
+  </div>`;
+  const f = $('#f');
+  if (f) {
+    $('#gps').onclick = () => navigator.geolocation?.getCurrentPosition(
+      (pos) => { f.latitud.value = pos.coords.latitude.toFixed(6); f.longitud.value = pos.coords.longitude.toFixed(6); },
+      () => alert('No se pudo obtener la ubicación'));
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api('/agro/lotes', { method: 'POST', body: datosForm(f) }); await lotes(app, aviso('Lote guardado con su pasaporte', 'ok')); }
+      catch (err) { await lotes(app, aviso(err.message)); }
+    };
+  }
+  app.querySelectorAll('[data-cos]').forEach((b) => b.onclick = async () => {
+    const kilos = prompt('Kilos cosechados:'); if (!kilos) return;
+    const fecha = prompt('Fecha (AAAA-MM-DD):', hoy()); if (!fecha) return;
+    try { await api(`/agro/lotes/${b.dataset.cos}/cosechas`, { method: 'POST', body: { kilos: Number(kilos), fecha } }); await lotes(app, aviso('Cosecha registrada', 'ok')); }
+    catch (err) { alert(err.message); }
+  });
+  app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+    if (!confirm('¿Eliminar el lote con sus cosechas y entregas?')) return;
+    try { await api('/agro/lotes/' + b.dataset.del, { method: 'DELETE' }); await lotes(app); } catch (err) { alert(err.message); }
+  });
+}
+
+// ── Acopio ──
+async function acopio(app, msg = '') {
+  const [{ lotes: ls }, { entregas: es }] = await Promise.all([api('/agro/lotes'), api('/agro/entregas')]);
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-5">Centro de acopio digital</h1>${msg}
+  ${!ls.length ? aviso('Primero registra un lote.', 'ok') : `
+  <form id="f" class="card mb-5 grid md:grid-cols-5 gap-3">
+    <div class="md:col-span-5 font-medium">Registrar entrega (saco)</div>
+    <select class="inp md:col-span-2" name="lote_id" required>${ls.map((l) => `<option value="${l.id}">${esc(l.nombre)} · ${esc(l.productor)}</option>`).join('')}</select>
+    <input class="inp" name="fecha_entrega" type="date" value="${hoy()}" required>
+    <input class="inp" name="kilos" data-num type="number" step="0.1" min="0" placeholder="Kilos" required>
+    <input class="inp" name="porcentaje_pactado" data-num type="number" step="0.1" min="0" max="100" placeholder="% pactado">
+    <input class="inp md:col-span-2" name="calidad" placeholder="Calidad (fermentado, humedad…)">
+    <button class="btn">Registrar y generar QR</button>
+  </form>`}
+  <div class="card overflow-x-auto">
+    ${es.length ? `<table class="w-full"><tr><th>Saco</th><th>Lote</th><th>Entrega</th><th>Venta</th><th>Al productor</th><th></th></tr>
+    ${es.map((e) => `<tr>
+      <td><a class="text-emerald-700 underline" href="/p/${esc(e.codigo)}" target="_blank">${esc(e.codigo)}</a></td>
+      <td>${esc(e.lote)}<div class="text-xs text-gray-400">${esc(e.productor)}</div></td>
+      <td>${esc(e.fecha_entrega)}<div class="text-xs text-gray-400">${num(e.kilos, 1)} kg${e.calidad ? ' · ' + esc(e.calidad) : ''}</div></td>
+      <td>${e.fecha_venta ? `${esc(e.fecha_venta)}<div class="text-xs text-gray-400">USD ${num(e.precio_referencia, 2)}/t · ${num(e.porcentaje_pactado, 1)} %</div>` : '<span class="text-xs text-gray-400">sin vender</span>'}</td>
+      <td>${e.monto_productor != null ? `USD ${num(e.monto_productor, 2)}<div class="text-xs ${e.pagado_at ? 'text-emerald-700' : 'text-amber-700'}">${e.pagado_at ? '✓ pagado' : 'pendiente de pago'}</div>` : '—'}</td>
+      <td class="text-right whitespace-nowrap">
+        ${!e.fecha_venta ? `<button class="btn2" data-venta="${e.id}" data-pct="${e.porcentaje_pactado ?? ''}">Registrar venta</button>` : ''}
+        ${e.monto_productor != null && !e.pagado_at ? `<button class="btn2" data-pago="${e.id}">Marcar pagado</button>` : ''}
+      </td></tr>`).join('')}</table>` : '<p class="text-sm text-gray-500">Aún no hay entregas.</p>'}
+  </div>`;
+  const f = $('#f');
+  if (f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    try { const d = await api('/agro/entregas', { method: 'POST', body: datosForm(f) }); await acopio(app, aviso(`Saco ${d.entrega.codigo} registrado. Su pasaporte: /p/${d.entrega.codigo}`, 'ok')); }
+    catch (err) { await acopio(app, aviso(err.message)); }
+  };
+  app.querySelectorAll('[data-venta]').forEach((b) => b.onclick = async () => {
+    const fecha_venta = prompt('Fecha de venta (AAAA-MM-DD):', hoy()); if (!fecha_venta) return;
+    const precio = prompt('Precio de referencia ese día (USD por tonelada):'); if (!precio) return;
+    const pct = prompt('% pactado con el productor:', b.dataset.pct); if (!pct) return;
+    try { await api(`/agro/entregas/${b.dataset.venta}/venta`, { method: 'POST', body: { fecha_venta, precio_referencia: Number(precio), porcentaje_pactado: Number(pct) } }); await acopio(app, aviso('Venta registrada', 'ok')); }
+    catch (err) { alert(err.message); }
+  });
+  app.querySelectorAll('[data-pago]').forEach((b) => b.onclick = async () => {
+    if (!confirm('¿Confirmas que se pagó al productor?')) return;
+    try { await api(`/agro/entregas/${b.dataset.pago}/pagado`, { method: 'POST' }); await acopio(app); } catch (err) { alert(err.message); }
+  });
+}
+
+// ── Pasaporte público ──
+async function pasaporte(app, cod) {
+  app.innerHTML = '<p class="text-sm text-gray-400">Cargando pasaporte…</p>';
+  let d;
+  try { d = await api(cod.startsWith('SC') ? '/agro/publico/saco/' + cod : '/agro/publico/lote/' + cod); }
+  catch (e) { app.innerHTML = aviso('Pasaporte no encontrado: ' + cod); return; }
+  const l = d.lote, s = d.saco;
+  const fila = (k, v) => `<div class="flex justify-between gap-4 py-1.5 border-b border-gray-100 text-sm"><span class="text-gray-500">${k}</span><span class="text-right">${v}</span></div>`;
+  app.innerHTML = `
+  <div class="max-w-2xl mx-auto card">
+    <div class="flex items-start justify-between gap-4">
+      <div><div class="text-xs uppercase tracking-widest text-emerald-700 font-semibold">Pasaporte digital · ${s ? 'saco' : 'lote'}</div>
+        <h1 class="text-2xl font-light mt-1">${esc(s ? s.codigo : l.nombre)}</h1>
+        <div class="text-sm text-gray-500">${esc(l.cultivo)} ${esc(l.variedad || '')} · ${esc(l.ubicacion || 'ubicación no registrada')}</div></div>
+      <div id="qr" class="shrink-0"></div>
+    </div>
+    <div class="mt-5">
+      ${s ? fila('Entregado en acopio', `${esc(s.fecha_entrega)} · ${num(s.kilos, 1)} kg${s.calidad ? ' · ' + esc(s.calidad) : ''}`)
+         + fila('Vendido', s.fecha_venta ? `${esc(s.fecha_venta)} · USD ${num(s.precio_referencia, 2)}/t` : 'aún no')
+         + fila('Pactado con el productor', s.porcentaje_pactado != null ? num(s.porcentaje_pactado, 1) + ' % del precio' : '—')
+         + fila('Recibió el productor', s.monto_productor != null ? `USD ${num(s.monto_productor, 2)} ${s.pagado ? '✓ pagado' : '(pendiente)'}` : '—') : ''}
+      ${fila('Lote de origen', `${esc(l.nombre)} (${esc(l.codigo)})`)}
+      ${fila('Productor', `${esc(l.productor.iniciales)}${l.productor.comunidad ? ' · ' + esc(l.productor.comunidad) : ''}`)}
+      ${fila('Superficie', l.hectareas != null ? num(l.hectareas, 2) + ' ha' : '—')}
+      ${fila('Coordenadas', l.coordenadas ? `${l.coordenadas.lat}, ${l.coordenadas.lng} <span class="text-xs text-gray-400">(±100 m)</span>` : 'no registradas')}
+      ${fila('No deforestación', l.sin_deforestacion.declarada ? `Declarada el ${esc((l.sin_deforestacion.fecha || '').slice(0, 10))}` : 'sin declaración')}
+    </div>
+    ${l.sin_deforestacion.declarada ? `<p class="text-xs text-gray-400 mt-3">${esc(l.sin_deforestacion.nota)}</p>` : ''}
+    ${d.cosechas && d.cosechas.length ? `<div class="mt-4 text-sm"><div class="font-medium mb-1">Cosechas recientes</div>${d.cosechas.map((c) => `<div class="text-gray-600">${esc(c.fecha)} · ${num(c.kilos)} kg</div>`).join('')}</div>` : ''}
+  </div>`;
+  if (window.QRCode) new QRCode($('#qr'), { text: location.href, width: 96, height: 96, colorDark: '#065f46' });
+}
+
+render();
+</script>
+</body>
+</html>

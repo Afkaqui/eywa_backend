@@ -95,6 +95,7 @@ model Profile {
   passwordResetTokens PasswordResetToken[]
   dataroomInvites     DataroomInvitation[] @relation("DataroomInvites")
   apiClients          ApiClient[]          @relation("ApiClients")
+  agroProductores     AgroProductor[]
 
 
   @@map("profiles")
@@ -794,4 +795,81 @@ model ApiClient {
   organizations Organization[]
 
   @@map("api_clients")
+}
+
+// ─── Vertical AGRO (agro.encsust4in4ble.earth) ────────────────────────────────
+// Trazabilidad de lotes, centro de acopio digital y pasaporte del lote/saco.
+model AgroProductor {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  nombre    String
+  dni       String?
+  comunidad String?
+  telefono  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner Profile    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  lotes AgroLote[]
+
+  @@index([ownerId])
+  @@map("agro_productores")
+}
+
+model AgroLote {
+  id                        String    @id @default(uuid()) @db.Uuid
+  productorId               String    @map("productor_id") @db.Uuid
+  codigo                    String    @unique
+  nombre                    String
+  cultivo                   String    @default("cacao")
+  variedad                  String?
+  hectareas                 Float?
+  departamento              String?
+  provincia                 String?
+  distrito                  String?
+  latitud                   Float?
+  longitud                  Float?
+  poligono                  Json?
+  sinDeforestacionDeclarada Boolean   @default(false) @map("sin_deforestacion_declarada")
+  declaradaAt               DateTime? @map("declarada_at")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+
+  productor AgroProductor @relation(fields: [productorId], references: [id], onDelete: Cascade)
+  cosechas  AgroCosecha[]
+  entregas  AgroEntrega[]
+
+  @@index([productorId])
+  @@map("agro_lotes")
+}
+
+model AgroCosecha {
+  id        String   @id @default(uuid()) @db.Uuid
+  loteId    String   @map("lote_id") @db.Uuid
+  fecha     DateTime @db.Date
+  kilos     Float
+  nota      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lote AgroLote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+
+  @@map("agro_cosechas")
+}
+
+model AgroEntrega {
+  id                 String    @id @default(uuid()) @db.Uuid
+  loteId             String    @map("lote_id") @db.Uuid
+  codigo             String    @unique
+  fechaEntrega       DateTime  @map("fecha_entrega") @db.Date
+  kilos              Float
+  calidad            String?
+  porcentajePactado  Float?    @map("porcentaje_pactado")
+  fechaVenta         DateTime? @map("fecha_venta") @db.Date
+  precioReferencia   Float?    @map("precio_referencia")
+  montoProductor     Float?    @map("monto_productor")
+  pagadoAt           DateTime? @map("pagado_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  lote AgroLote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+
+  @@index([loteId])
+  @@map("agro_entregas")
 }

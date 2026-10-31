@@ -29,6 +29,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
+# App de la vertical agro (agro.encsust4in4ble.earth): estática, sin build.
+COPY agro-web ./agro-web
 
 EXPOSE 4001
 
