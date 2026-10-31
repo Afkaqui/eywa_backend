@@ -42,7 +42,26 @@ app.use('*', async (c, next) => {
   if (!esAgro(c.req.header('host')) || c.req.path.startsWith('/api/')) return next();
   return serveStatic({ root: path.relative(process.cwd(), AGRO_DIR) })(c, async () => {
     c.header('Content-Type', 'text/html; charset=utf-8');
-    c.res = c.body(readFileSync(path.join(AGRO_DIR, 'index.html'), 'utf8'));
+    let html = readFileSync(path.join(AGRO_DIR, 'index.html'), 'utf8');
+    // Pasaporte: metadatos propios para que al compartir el QR (WhatsApp, redes) se
+    // vea qué es. Solo el código, que ya es público; nada del productor.
+    const m = c.req.path.match(/^\/p\/((?:LT|SC)-[0-9A-F]{8})$/i);
+    if (m) {
+      const cod = m[1].toUpperCase();
+      const tipo = cod.startsWith('SC') ? 'saco' : 'lote';
+      const titulo = `Pasaporte digital del ${tipo} ${cod} · EYWA Agro`;
+      const desc = `Origen, georreferencia, declaración de no deforestación${tipo === 'saco' ? ', venta y pago al productor' : ' y cosechas'} del ${tipo} ${cod}.`;
+      const url = `https://agro.encsust4in4ble.earth/p/${cod}`;
+      html = html
+        .replace(/<title>[^<]*<\/title>/, `<title>${titulo}</title>`)
+        .replace(/(property="og:title" content=")[^"]*/, `$1${titulo}`)
+        .replace(/(name="twitter:title" content=")[^"]*/, `$1${titulo}`)
+        .replace(/(property="og:description" content=")[^"]*/, `$1${desc}`)
+        .replace(/(name="description" content=")[^"]*/, `$1${desc}`)
+        .replace(/(property="og:url" content=")[^"]*/, `$1${url}`)
+        .replace(/(rel="canonical" href=")[^"]*/, `$1${url}`);
+    }
+    c.res = c.body(html);
   });
 });
 
