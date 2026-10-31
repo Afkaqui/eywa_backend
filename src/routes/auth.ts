@@ -67,9 +67,11 @@ authRouter.post('/register', async (c) => {
     throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos inválidos');
   }
 
-  const { email, password, full_name, company } = parsed.data;
+  const { password, full_name, company } = parsed.data;
+  // Se guarda en minúsculas: "Ana@Empresa.pe" y "ana@empresa.pe" son la misma persona.
+  const email = parsed.data.email.trim().toLowerCase();
 
-  const existing = await db.profile.findUnique({ where: { email } });
+  const existing = await db.profile.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
   if (existing) throw new ApiError(409, 'El email ya está registrado');
 
   const passwordHash = await hashPassword(password);
@@ -103,8 +105,11 @@ authRouter.post('/login', async (c) => {
 
   if (!parsed.success) throw new ApiError(400, 'Email o contraseña inválidos');
 
-  const { email, password } = parsed.data;
-  const user = await db.profile.findUnique({ where: { email } });
+  const { password } = parsed.data;
+  // Sin distinguir mayúsculas: las cuentas antiguas pueden estar guardadas con
+  // mayúsculas y deben seguir entrando escriban como escriban su correo.
+  const email = parsed.data.email.trim();
+  const user = await db.profile.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
   if (!user) throw new ApiError(401, 'Credenciales incorrectas');
 
   const valid = await verifyPassword(password, user.password);
