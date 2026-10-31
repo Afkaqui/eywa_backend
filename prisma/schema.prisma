@@ -660,6 +660,10 @@ model ProjectPlan {
   // ── MAVI / ARS LAB (§14) ───────────────────────────────────────────────────
   /// idea | prototipo | operando. Pesa en el score de MAVI.
   etapa            String?
+  // Definición del problema (actor, dolor, causa raíz, urgencia, consecuencia,
+  // unidad de validación) y Máximo Producto Posible. PLAN C1, C2.
+  problema         Json?
+  mpp              Json?
   /// Cuándo aceptó enviar sus datos a ARS. NULL = no aceptó, no se puede enviar.
   maviConsentAt    DateTime? @map("mavi_consent_at")
   maviProjectId    String?   @unique @map("mavi_project_id")

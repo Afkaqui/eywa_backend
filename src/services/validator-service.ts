@@ -144,6 +144,22 @@ async function callExternalAI(plan: ProjectPlan, docText = ''): Promise<Validati
   return normalizeReport(parsed, 'ai');
 }
 
+// Definición del problema y MPP (PLAN C1, C2) como texto para el análisis.
+const NL = String.fromCharCode(10);
+function problemaTexto(p: unknown): string {
+  const x = (p ?? {}) as Record<string, string | null>;
+  const campos: [string, string][] = [['actor', 'Actor afectado'], ['dolor', 'Dolor'], ['causa_raiz', 'Causa raíz'],
+    ['urgencia', 'Urgencia'], ['consecuencia', 'Consecuencia si no se actúa'], ['unidad_validacion', 'Unidad de validación (quién lo quiere)']];
+  const lineas = campos.filter(([k]) => x[k]).map(([k, t]) => `- ${t}: ${x[k]}`);
+  return lineas.length ? `Definición del problema:${NL}${lineas.join(NL)}` : '';
+}
+function mppTexto(m: unknown): string {
+  const x = (m ?? {}) as { insumo?: string; subproductos?: { nombre: string; uso?: string; sector?: string; estado?: string }[] };
+  if (!x.insumo && !x.subproductos?.length) return '';
+  const subs = (x.subproductos ?? []).map((s) => `- ${s.nombre}${s.uso ? ` (${s.uso})` : ''}${s.sector ? ` → ${s.sector}` : ''} [${s.estado ?? 'potencial'}]`);
+  return `Máximo Producto Posible${x.insumo ? ` del insumo "${x.insumo}"` : ''}:${NL}${subs.join(NL)}`;
+}
+
 function buildPrompt(plan: ProjectPlan, docText = ''): string {
   return [
     `Analiza el siguiente plan de proyecto de sostenibilidad y genera el reporte ESG en JSON.`,
@@ -156,6 +172,8 @@ function buildPrompt(plan: ProjectPlan, docText = ''): string {
     `Meta de reducción de CO₂: ${plan.carbonGoal} toneladas`,
     plan.objectives   ? `Objetivos: ${plan.objectives}` : '',
     plan.stakeholders ? `Stakeholders: ${plan.stakeholders}` : '',
+    problemaTexto(plan.problema),
+    mppTexto(plan.mpp),
     // Fase 3: contenido extraído de los documentos adjuntos (solo si READ_DOCS).
     docText ? `\nContenido de los documentos adjuntos del proyecto:\n${docText}` : '',
   ].filter(Boolean).join('\n');

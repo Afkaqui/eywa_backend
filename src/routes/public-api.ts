@@ -6,6 +6,7 @@ import { ActorRepository } from '@/repositories/actor-repository';
 import { AcademyRepository } from '@/repositories/academy-repository';
 import { DataroomRepository } from '@/repositories/dataroom-repository';
 import { db } from '@/lib/db';
+import { GLOSARIO, GLOSARIO_VERSION, GLOSARIO_ESTADO } from '@/lib/glosario';
 
 // ══ API pública v1 — capa SIN clave (PENDIENTES §9) ════════════════════════════
 //
@@ -170,4 +171,11 @@ publicApiRouter.get('/empresas/:slug', async (c) => {
     aviso: 'El porcentaje indica cuánta documentación de la empresa está cargada en su dataroom de EYWA. ' +
            'No es una auditoría ni una certificación de su contenido.',
   });
+});
+
+// ══ Glosario (PLAN C3) ═════════════════════════════════════════════════════════
+// Una sola fuente para la Academia de EYWA y para EYWA Agro.
+publicApiRouter.get('/glosario', (c) => {
+  cacheable(c);
+  return c.json({ version: GLOSARIO_VERSION, estado: GLOSARIO_ESTADO, terminos: GLOSARIO });
 });

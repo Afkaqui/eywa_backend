@@ -70,6 +70,8 @@ function serialize(plan: Awaited<ReturnType<ValidatorRepository['getByIdForUser'
     analyzedAt:   plan.analyzedAt?.toISOString() ?? null,
     createdAt:    plan.createdAt.toISOString(),
     etapa:        plan.etapa,
+    problema:     plan.problema ?? null,
+    mpp:          plan.mpp ?? null,
     mavi: {
       // Si nunca se envió, todo esto va en null y la UI muestra el botón.
       consentido:  !!plan.maviConsentAt,
@@ -84,6 +86,43 @@ function serialize(plan: Awaited<ReturnType<ValidatorRepository['getByIdForUser'
     },
   };
 }
+
+// ── PUT /api/validator/plans/:id/estructura ──────────────────────────────────
+// Definición del problema y Máximo Producto Posible (PLAN C1, C2). Van aparte del
+// alta para poder completarse después y alimentar el análisis.
+const txtLargo = z.string().trim().max(1500).nullish();
+const estructuraSchema = z.object({
+  problema: z.object({
+    actor: txtLargo, dolor: txtLargo, causa_raiz: txtLargo,
+    urgencia: txtLargo, consecuencia: txtLargo, unidad_validacion: txtLargo,
+  }).nullish(),
+  mpp: z.object({
+    insumo: z.string().trim().max(200).nullish(),
+    subproductos: z.array(z.object({
+      nombre: z.string().trim().min(1).max(150),
+      uso:    z.string().trim().max(300).nullish(),
+      sector: z.string().trim().max(150).nullish(),
+      estado: z.enum(['actual', 'potencial']).default('potencial'),
+    })).max(40).default([]),
+  }).nullish(),
+});
+
+validatorRouter.put('/plans/:id/estructura', async (c) => {
+  const user = getRequestUser(c);
+  const plan = await validatorRepo.getByIdForUser(c.req.param('id'), user.sub);
+  if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
+  const parsed = estructuraSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos inválidos');
+  await db.projectPlan.update({
+    where: { id: plan.id },
+    data: {
+      ...(parsed.data.problema !== undefined ? { problema: parsed.data.problema ?? Prisma.DbNull } : {}),
+      ...(parsed.data.mpp !== undefined ? { mpp: parsed.data.mpp ?? Prisma.DbNull } : {}),
+    },
+  });
+  const actualizado = await validatorRepo.getByIdForUser(plan.id, user.sub);
+  return c.json({ plan: serialize(actualizado) });
+});
 
 // ── GET /api/validator/plans ─────────────────────────────────────────────────
 validatorRouter.get('/plans', async (c) => {

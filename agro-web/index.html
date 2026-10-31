@@ -72,12 +72,13 @@ async function api(ruta, opt = {}) {
   return d;
 }
 function salir() { document.querySelector('header').style.display = ''; token = null; try { sessionStorage.removeItem('agro_token'); } catch {} ; ir('/'); }
+window.ir = ir;
 function ir(ruta) { history.pushState({}, '', ruta); render(); }
 window.addEventListener('popstate', render);
 document.addEventListener('click', (e) => { const a = e.target.closest('a[data-ir]'); if (a) { e.preventDefault(); ir(a.getAttribute('href')); } });
 
 function nav() {
-  const items = token ? [['/', 'Panel'], ['/productores', 'Productores'], ['/lotes', 'Lotes'], ['/acopio', 'Acopio']] : [];
+  const items = token ? [['/', 'Panel'], ['/productores', 'Productores'], ['/lotes', 'Lotes'], ['/acopio', 'Acopio'], ['/fondos', 'Fondos'], ['/actores', 'Actores'], ['/glosario', 'Glosario']] : [];
   $('#nav').innerHTML = items.map(([h, t]) => `<a data-ir href="${h}" class="px-3 py-1.5 rounded-full ${location.pathname === h ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}">${t}</a>`).join('')
     + (token ? '<button id="salir" class="px-3 py-1.5 text-gray-500 hover:text-gray-800">Salir</button>' : '');
   const s = $('#salir'); if (s) s.onclick = salir;
@@ -106,6 +107,9 @@ async function render() {
     if (p === '/productores') return await productores(app);
     if (p === '/lotes') return await lotes(app);
     if (p === '/acopio') return await acopio(app);
+    if (p === '/fondos') return await fondos(app);
+    if (p === '/actores') return await actores(app);
+    if (p === '/glosario') return await glosario(app);
     return await panel(app);
   } catch (e) { app.innerHTML = aviso(e.message); }
 }
@@ -184,6 +188,15 @@ async function panel(app) {
       <li>Al vender, registra la fecha y el precio de referencia: queda calculado lo que le corresponde al productor según el % pactado, y cuándo se le pagó.</li>
     </ol>
     <p class="text-xs text-gray-400 mt-3">La "no deforestación" es una declaración del productor con fecha; aún no hay verificación satelital.</p>
+  </div>
+  <div class="card mt-4 text-sm">
+    <p class="font-medium text-gray-800 mb-2">Con tu misma cuenta, en EYWA</p>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn2" href="${EYWA}" target="_blank" rel="noopener">Diagnóstico GENES de tu organización</a>
+      <a class="btn2" href="${EYWA}" target="_blank" rel="noopener">Dataroom</a>
+      <a class="btn2" href="${EYWA}" target="_blank" rel="noopener">Validador de proyectos</a>
+      <a class="btn2" href="${EYWA}" target="_blank" rel="noopener">Academia</a>
+    </div>
   </div>`;
 }
 
@@ -325,6 +338,55 @@ async function acopio(app, msg = '') {
     if (!confirm('¿Confirmas que se pagó al productor?')) return;
     try { await api(`/agro/entregas/${b.dataset.pago}/pagado`, { method: 'POST' }); await acopio(app); } catch (err) { alert(err.message); }
   });
+}
+
+// ══ Módulos reciclados de EYWA (misma API, misma cuenta) ═══════════════════════
+const EYWA = 'https://eywa.encsust4in4ble.earth';
+
+// Fondos: el mismo catálogo de EYWA (con su verificador nocturno), filtrado a agro.
+async function fondos(app) {
+  const r = await fetch('/api/funds', { headers: { Authorization: 'Bearer ' + token } });
+  if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-light mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de EYWA.', 'ok'); return; }
+  const d = await r.json();
+  const todos = d.funds || [];
+  const agro = todos.filter((f) => (f.sector_tags || []).some((t) => ['agro', 'ambiente', 'clima', 'circular'].includes(t)));
+  const vig = (f) => !f.deadline || new Date(f.deadline) > new Date();
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-1">Fondos para agro</h1>
+  <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de EYWA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
+  <div class="card overflow-x-auto"><table class="w-full"><tr><th>Fondo</th><th>Instrumento</th><th>Monto</th><th>Cierre</th></tr>
+  ${agro.sort((a, b) => vig(b) - vig(a)).map((f) => `<tr class="${vig(f) ? '' : 'opacity-50'}">
+    <td>${f.url ? `<a class="text-emerald-700 underline" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}
+      <div class="text-xs text-gray-400">${esc(f.scope)}${f.verify_status === 'enlace_roto' ? ' · enlace por verificar' : ''}</div></td>
+    <td>${esc(f.instrument_type)}</td><td class="text-xs">${esc(f.amounts || '—')}</td>
+    <td class="text-xs">${f.deadline ? esc(f.deadline.slice(0, 10)) + (vig(f) ? '' : ' (cerrado)') : esc(f.deadline_text || '—')}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+// Actores: el directorio de inversión de impacto de EYWA (capa pública, sin datos de contacto).
+async function actores(app) {
+  const d = await api('/public/v1/actores?por_pagina=100&q=' + encodeURIComponent(new URLSearchParams(location.search).get('q') || ''));
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-1">Actores del ecosistema</h1>
+  <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de EYWA).</p>
+  <form class="mb-4 flex gap-2" onsubmit="event.preventDefault(); ir('/actores?q=' + encodeURIComponent(this.q.value))">
+    <input class="inp" name="q" placeholder="Buscar: cacao, agro, café, cooperativa…" value="${esc(new URLSearchParams(location.search).get('q') || '')}"><button class="btn">Buscar</button></form>
+  <div class="grid md:grid-cols-2 gap-3">${d.actores.map((a) => `<div class="card !p-4">
+    <div class="font-medium">${a.web ? `<a class="hover:text-emerald-700" href="${esc(a.web.startsWith('http') ? a.web : 'https://' + a.web)}" target="_blank" rel="noopener">${esc(a.nombre)}</a>` : esc(a.nombre)}</div>
+    <div class="text-xs text-gray-500">${esc(a.pais)} · ${esc(a.categoria.replace(/_/g, ' '))}</div>
+    ${a.descripcion ? `<p class="text-sm text-gray-600 mt-1">${esc(a.descripcion.slice(0, 220))}${a.descripcion.length > 220 ? '…' : ''}</p>` : ''}</div>`).join('')}</div>`;
+}
+
+// Glosario: la misma fuente que la Academia de EYWA.
+async function glosario(app) {
+  const d = await api('/public/v1/glosario');
+  const cats = [...new Set(d.terminos.map((t) => t.categoria))].sort((a, b) => (a === 'Agro' ? -1 : b === 'Agro' ? 1 : 0));
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-1">Glosario</h1>
+  <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">${esc(d.estado)}</p>
+  ${cats.map((c) => `<div class="mb-6"><div class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">${esc(c)}</div>
+    ${d.terminos.filter((t) => t.categoria === c).map((t) => `<div class="mb-3"><div class="font-medium text-sm">${esc(t.termino)}${t.sigla ? ` <span class="text-emerald-700">· ${esc(t.sigla)}</span>` : ''}</div>
+    <div class="text-sm text-gray-600">${esc(t.definicion)}</div></div>`).join('')}</div>`).join('')}`;
 }
 
 // ── Pasaporte público ──
