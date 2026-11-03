@@ -59,7 +59,7 @@
       <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain shrink-0">
       <span class="leading-tight hidden sm:block"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
       <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
-      <span class="font-extrabold sm:hidden whitespace-nowrap text-[15px]">EYWA <span class="text-emerald-600">AGRO</span></span>
+      <span class="font-extrabold hidden min-[400px]:inline sm:hidden whitespace-nowrap text-[15px]">EYWA <span class="text-emerald-600">AGRO</span></span>
     </a>
     <div id="orgsel" class="ml-auto min-w-0"></div>
     <button id="hamb" class="lg:hidden btn2 shrink-0" aria-label="Menú" aria-expanded="false">☰</button>
@@ -115,7 +115,7 @@ function cabecera() {
   const s = $('#salir'); if (s) s.onclick = salir;
   $('#hamb').style.display = token ? '' : 'none';
   $('#orgsel').innerHTML = token && orgs.length ? `
-    <select id="org" class="inp !py-1.5 !text-sm max-w-[11rem] sm:max-w-xs truncate" aria-label="Organización activa">
+    <select id="org" class="inp !py-1.5 !text-sm max-w-[13rem] sm:max-w-xs truncate" aria-label="Organización activa">
       ${orgs.map((o) => `<option value="${o.id}" ${org && o.id === org.id ? 'selected' : ''}>${esc(o.nombre)} · ${esc(etiquetaRol(o.rol))}</option>`).join('')}
       <option value="__nueva">+ Nueva organización</option>
     </select>` : '';
@@ -370,7 +370,7 @@ async function lotes(app, msg = '') {
       <div class="text-xs ${l.latitud != null ? 'text-emerald-700' : 'text-amber-700'}">${l.latitud != null ? '✓ georreferenciada' : 'sin coordenadas'}</div>
       <div class="text-xs ${l.sin_deforestacion ? 'text-emerald-700' : 'text-gray-400'}">${l.sin_deforestacion ? '✓ declaración no deforestación' : 'sin declaración'}</div>`,
     num(l.hectareas, 2), num(l.kilos_cosechados) + ' kg',
-    `<a class="text-emerald-700 underline text-xs" href="/p/${esc(l.codigo)}" target="_blank">${esc(l.codigo)}</a>`,
+    `<a class="text-emerald-700 underline text-xs whitespace-nowrap" href="/p/${esc(l.codigo)}" target="_blank">${esc(l.codigo)}</a>`,
     (puede.escribir() ? `<button class="btn2" data-cos="${l.id}">+ Cosecha</button> ` : '') + (puede.admin() ? `<button class="btn2" data-del="${l.id}">Eliminar</button>` : ''),
   ]), 'Aún no hay parcelas.')}</div>`;
   const f = $('#f');
@@ -409,7 +409,7 @@ async function acopio(app, msg = '') {
   </form>`;
   app.innerHTML = `<h1 class="text-2xl font-light mb-5">Centro de acopio digital</h1>${msg}${form}
   <div class="card rt-wrap">${tabla(['Saco', 'Parcela', 'Entrega', 'Venta', 'Al productor', ''], es.map((e) => [
-    `<a class="text-emerald-700 underline" href="/p/${esc(e.codigo)}" target="_blank">${esc(e.codigo)}</a>`,
+    `<a class="text-emerald-700 underline whitespace-nowrap" href="/p/${esc(e.codigo)}" target="_blank">${esc(e.codigo)}</a>`,
     `${esc(e.lote)}<div class="text-xs text-gray-400">${esc(e.productor)}</div>`,
     `${esc(e.fecha_entrega)}<div class="text-xs text-gray-400">${num(e.kilos, 1)} kg${e.calidad ? ' · ' + esc(e.calidad) : ''}</div>`,
     e.fecha_venta ? `${esc(e.fecha_venta)}<div class="text-xs text-gray-400">USD ${num(e.precio_referencia, 2)}/t · ${num(e.porcentaje_pactado, 1)} %</div>` : '<span class="text-xs text-gray-400">sin vender</span>',
