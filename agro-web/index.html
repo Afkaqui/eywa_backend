@@ -25,64 +25,108 @@
 <link rel="apple-touch-icon" href="/logo.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f9fafb; }
-  .inp { width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .5rem .75rem; font-size: .875rem; background: #fff; }
+  .inp { width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .55rem .75rem; font-size: 16px; background: #fff; } /* 16px: evita el zoom automático de iOS */
   .inp:focus { outline: 2px solid #10b981; outline-offset: 0; }
-  .btn { background: #059669; color: #fff; border-radius: .5rem; padding: .5rem 1rem; font-size: .875rem; font-weight: 600; }
+  @media (min-width: 768px) { .inp { font-size: .875rem; } }
+  .btn { background: #059669; color: #fff; border-radius: .5rem; padding: .55rem 1rem; font-size: .875rem; font-weight: 600; min-height: 40px; }
   .btn:hover { background: #047857; } .btn:disabled { opacity: .5; }
-  .btn2 { border: 1px solid #e5e7eb; border-radius: .5rem; padding: .375rem .75rem; font-size: .75rem; font-weight: 500; color: #374151; background: #fff; }
+  .btn2 { border: 1px solid #e5e7eb; border-radius: .5rem; padding: .45rem .75rem; font-size: .8rem; font-weight: 500; color: #374151; background: #fff; min-height: 36px; }
+  .btn2:hover { background: #f9fafb; }
   .card { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1.25rem; }
-  th { text-align: left; font-size: .7rem; text-transform: uppercase; color: #6b7280; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
-  td { padding: .5rem; border-bottom: 1px solid #f3f4f6; font-size: .85rem; vertical-align: top; }
+  .rt { width: 100%; border-collapse: collapse; }
+  .rt th { text-align: left; font-size: .7rem; text-transform: uppercase; color: #6b7280; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
+  .rt td { padding: .55rem .5rem; border-bottom: 1px solid #f3f4f6; font-size: .85rem; vertical-align: top; }
+  /* Móvil: cada fila de tabla es una tarjeta con su etiqueta */
+  @media (max-width: 767px) {
+    .rt thead { display: none; }
+    .rt tr { display: block; border: 1px solid #e5e7eb; border-radius: .75rem; padding: .5rem .75rem; margin-bottom: .6rem; background: #fff; }
+    .rt td { display: flex; justify-content: space-between; gap: 1rem; border: 0; padding: .3rem 0; text-align: right; }
+    .rt td::before { content: attr(data-l); font-size: .7rem; text-transform: uppercase; color: #6b7280; text-align: left; flex-shrink: 0; padding-top: .1rem; }
+    .rt td.acc { justify-content: flex-end; flex-wrap: wrap; } .rt td.acc::before { content: none; }
+    .rt-wrap { border: 0 !important; padding: 0 !important; background: transparent !important; }
+  }
+  dialog::backdrop { background: rgba(17,24,39,.45); }
+  dialog { border: 0; border-radius: 1rem; padding: 0; width: min(92vw, 440px); }
 </style>
 </head>
 <body class="text-gray-800">
-<header class="bg-white border-b border-gray-200">
+<header id="cab" class="bg-white border-b border-gray-200 sticky top-0 z-30">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-    <a href="/" class="flex items-center gap-2">
-      <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain">
-      <span class="leading-tight"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
+    <a href="/" data-ir class="flex items-center gap-2 min-w-0">
+      <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain shrink-0">
+      <span class="leading-tight hidden sm:block"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
       <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
+      <span class="font-extrabold sm:hidden">EYWA <span class="text-emerald-600">AGRO</span></span>
     </a>
-    <nav id="nav" class="ml-auto flex gap-1 text-sm"></nav>
+    <div id="orgsel" class="ml-auto min-w-0"></div>
+    <button id="hamb" class="lg:hidden btn2 shrink-0" aria-label="Menú" aria-expanded="false">☰</button>
   </div>
+  <nav id="nav" class="max-w-6xl mx-auto px-4 pb-2 hidden lg:flex flex-wrap gap-1 text-sm"></nav>
 </header>
 <main id="app" class="max-w-6xl mx-auto px-4 py-6"></main>
+<dialog id="dlg"></dialog>
 
 <script>
-// ══ EYWA Agro — trazabilidad de lotes, acopio digital y pasaporte ══════════════
-// Misma cuenta que EYWA. El token se guarda en sessionStorage (se cierra con la
-// pestaña). Los textos que vienen del servidor se insertan siempre escapados.
+// ══ EYWA Agro — trazabilidad por organización ═══════════════════════════════════
+// Misma cuenta y API que EYWA. Todo dato pertenece a una ORGANIZACIÓN (cooperativa,
+// asociación, agroindustria); la activa viaja en la cabecera X-Agro-Org.
+// Roles: admin (todo, incl. ventas/pagos y equipo) · tecnico (registra) · lector.
+// Los textos del servidor se insertan siempre escapados.
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n, d = 0) => (n == null ? '—' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: d }));
 const hoy = () => new Date().toISOString().slice(0, 10);
-let token = null; try { token = sessionStorage.getItem('agro_token'); } catch {}
+const EYWA = 'https://eywa.encsust4in4ble.earth';
+const leer = (k) => { try { return sessionStorage.getItem(k); } catch { return null; } };
+const guardar = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} };
+let token = leer('agro_token');
+let orgs = [];          // organizaciones del usuario
+let org = null;         // activa
+const puede = { escribir: () => org && org.rol !== 'lector', admin: () => org && org.rol === 'admin' };
 
 async function api(ruta, opt = {}) {
   const r = await fetch('/api' + ruta, {
     method: opt.method || 'GET',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(org ? { 'X-Agro-Org': org.id } : {}) },
     body: opt.body ? JSON.stringify(opt.body) : undefined,
   });
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && token) { salir(); throw new Error('Tu sesión expiró'); }
-  if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
-  return d;
+  if (!r.ok && !opt.aceptar?.includes(r.status)) throw new Error(d.error || ('Error ' + r.status));
+  return opt.conEstado ? { status: r.status, d } : d;
 }
-function salir() { document.querySelector('header').style.display = ''; token = null; try { sessionStorage.removeItem('agro_token'); } catch {} ; ir('/'); }
-window.ir = ir;
+function salir() { token = null; org = null; orgs = []; guardar('agro_token', null); guardar('agro_org', null); ir('/'); }
 function ir(ruta) { history.pushState({}, '', ruta); render(); }
+window.ir = ir;
 window.addEventListener('popstate', render);
-document.addEventListener('click', (e) => { const a = e.target.closest('a[data-ir]'); if (a) { e.preventDefault(); ir(a.getAttribute('href')); } });
+document.addEventListener('click', (e) => { const a = e.target.closest('a[data-ir]'); if (a) { e.preventDefault(); cerrarMenu(); ir(a.getAttribute('href')); } });
 
-function nav() {
-  const items = token ? [['/', 'Panel'], ['/productores', 'Productores'], ['/lotes', 'Lotes'], ['/acopio', 'Acopio'], ['/fondos', 'Fondos'], ['/actores', 'Actores'], ['/glosario', 'Glosario']] : [];
-  $('#nav').innerHTML = items.map(([h, t]) => `<a data-ir href="${h}" class="px-3 py-1.5 rounded-full ${location.pathname === h ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}">${t}</a>`).join('')
-    + (token ? '<button id="salir" class="px-3 py-1.5 text-gray-500 hover:text-gray-800">Salir</button>' : '');
+// ── Cabecera: organización activa + menú (hamburguesa en móvil) ──
+function cerrarMenu() { const n = $('#nav'); if (window.innerWidth < 1024) n.classList.add('hidden'); $('#hamb').setAttribute('aria-expanded', 'false'); }
+$('#hamb').onclick = () => { const n = $('#nav'); n.classList.toggle('hidden'); n.classList.add('flex'); $('#hamb').setAttribute('aria-expanded', String(!n.classList.contains('hidden'))); };
+function cabecera() {
+  const items = token && org ? [['/', 'Panel'], ['/productores', 'Productores'], ['/lotes', 'Parcelas'], ['/acopio', 'Acopio'],
+    ...(puede.escribir() ? [['/importar', 'Importar Excel']] : []), ['/equipo', 'Equipo'], ['/fondos', 'Fondos'], ['/actores', 'Actores'], ['/glosario', 'Glosario']] : [];
+  $('#nav').innerHTML = items.map(([h, t]) => `<a data-ir href="${h}" class="px-3 py-2 rounded-full whitespace-nowrap ${location.pathname === h ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}">${t}</a>`).join('')
+    + (token ? '<button id="salir" class="px-3 py-2 text-gray-500 hover:text-gray-800 text-left">Salir</button>' : '');
   const s = $('#salir'); if (s) s.onclick = salir;
+  $('#hamb').style.display = token ? '' : 'none';
+  $('#orgsel').innerHTML = token && orgs.length ? `
+    <select id="org" class="inp !py-1.5 !text-sm max-w-[11rem] sm:max-w-xs truncate" aria-label="Organización activa">
+      ${orgs.map((o) => `<option value="${o.id}" ${org && o.id === org.id ? 'selected' : ''}>${esc(o.nombre)} · ${esc(etiquetaRol(o.rol))}</option>`).join('')}
+      <option value="__nueva">+ Nueva organización</option>
+    </select>` : '';
+  const sel = $('#org');
+  if (sel) sel.onchange = () => {
+    if (sel.value === '__nueva') return ir('/organizaciones');
+    org = orgs.find((o) => o.id === sel.value); guardar('agro_org', org.id); render();
+  };
 }
+const etiquetaRol = (r) => ({ admin: 'administrador', tecnico: 'técnico de campo', lector: 'lector' }[r] || r);
+
 function aviso(msg, tipo = 'error') {
   return `<div class="mb-4 text-sm rounded-lg p-3 ${tipo === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}">${esc(msg)}</div>`;
 }
@@ -96,17 +140,50 @@ function datosForm(f) {
   }
   return o;
 }
+// Tabla que en móvil se convierte en tarjetas (cada celda lleva su etiqueta).
+function tabla(cols, filas, vacio) {
+  if (!filas.length) return `<p class="text-sm text-gray-500">${vacio}</p>`;
+  return `<table class="rt"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>
+    ${filas.map((f) => `<tr>${f.map((v, i) => (cols[i] === '' ? `<td class="acc">${v}</td>` : `<td data-l="${cols[i]}">${v}</td>`)).join('')}</tr>`).join('')}</tbody></table>`;
+}
+// Ventana con formulario (reemplaza a prompt(), que en el celular se ve mal).
+function modal(titulo, campos, alEnviar) {
+  const d = $('#dlg');
+  d.innerHTML = `<form method="dialog" class="p-5 space-y-3"><div class="font-semibold text-lg">${titulo}</div><div id="dmsg"></div>
+    ${campos.map((c) => `<label class="block"><span class="text-sm text-gray-600">${c.t}</span>
+      <input class="inp mt-1" name="${c.n}" type="${c.tipo || 'text'}" ${c.num ? 'data-num step="any"' : ''} value="${esc(c.v ?? '')}" ${c.req ? 'required' : ''} ${c.min != null ? `min="${c.min}"` : ''} ${c.max != null ? `max="${c.max}"` : ''}></label>`).join('')}
+    <div class="flex gap-2 justify-end pt-2"><button value="cancel" formnovalidate class="btn2">Cancelar</button><button class="btn" value="ok">Guardar</button></div></form>`;
+  const f = d.querySelector('form');
+  f.onsubmit = async (e) => {
+    if (e.submitter?.value !== 'ok') return;
+    e.preventDefault();
+    try { await alEnviar(datosForm(f)); d.close(); } catch (err) { $('#dmsg').innerHTML = aviso(err.message); }
+  };
+  d.showModal();
+}
+
+async function cargarOrgs() {
+  orgs = (await api('/agro/organizaciones')).organizaciones;
+  const guardada = leer('agro_org');
+  org = orgs.find((o) => o.id === guardada) || orgs[0] || null;
+  if (org) guardar('agro_org', org.id);
+}
 
 async function render() {
-  nav();
   const p = location.pathname, app = $('#app');
   const pub = p.match(/^\/p\/((LT|SC)-[0-9A-F]{8})$/i);
-  if (pub) return pasaporte(app, pub[1].toUpperCase());
-  if (!token) return login(app);
+  if (pub) { cabecera(); return pasaporte(app, pub[1].toUpperCase()); }
+  if (!token) { cabecera(); return login(app); }
+  $('#cab').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
   try {
+    if (!orgs.length) await cargarOrgs();
+    cabecera();
+    if (!org || p === '/organizaciones') return nuevaOrganizacion(app);
     if (p === '/productores') return await productores(app);
     if (p === '/lotes') return await lotes(app);
     if (p === '/acopio') return await acopio(app);
+    if (p === '/importar') return importar(app);
+    if (p === '/equipo') return await equipo(app);
     if (p === '/fondos') return await fondos(app);
     if (p === '/actores') return await actores(app);
     if (p === '/glosario') return await glosario(app);
@@ -115,33 +192,31 @@ async function render() {
 }
 
 // ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
-// Mismo endpoint /api/auth/login: cualquier cuenta de EYWA entra aquí y viceversa.
-// Registro y recuperación de contraseña se hacen en EYWA (un solo lugar).
 function login(app) {
-  document.querySelector('header').style.display = 'none';
+  $('#cab').style.display = 'none';
   app.className = '';
   app.innerHTML = `
   <div class="min-h-screen flex">
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+    <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 bg-white">
       <div class="w-full max-w-md">
-        <a href="https://eywa.encsust4in4ble.earth" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Ir a EYWA</a>
-        <div class="flex items-center gap-3 mb-12">
+        <a href="${EYWA}" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Ir a EYWA</a>
+        <div class="flex items-center gap-3 mb-10">
           <img src="/logo.png" alt="EYWA" class="w-12 h-12 object-contain">
           <div><div class="text-gray-900 font-bold text-2xl tracking-tight">EYWA <span class="text-emerald-600">AGRO</span></div>
           <div class="text-emerald-600 text-xs tracking-wider">ORQUESTACIÓN DE ECOSISTEMAS</div></div>
         </div>
-        <h1 class="text-4xl font-light text-gray-900 mb-3">Bienvenido</h1>
+        <h1 class="text-3xl sm:text-4xl font-light text-gray-900 mb-3">Bienvenido</h1>
         <p class="text-gray-600 mb-8">Entra con tu cuenta de EYWA: es la misma.</p>
         <div id="msg"></div>
         <form id="f" class="space-y-5">
-          <div><label class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</label>
-            <input class="inp !py-3" name="email" type="email" placeholder="tu@empresa.com" required autocomplete="username"></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
-            <input class="inp !py-3" name="password" type="password" placeholder="••••••••" required autocomplete="current-password"></div>
-          <div class="text-right"><a href="https://eywa.encsust4in4ble.earth/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
+          <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</span>
+            <input class="inp" name="email" type="email" placeholder="tu@empresa.com" required autocomplete="username"></label>
+          <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Contraseña</span>
+            <input class="inp" name="password" type="password" placeholder="••••••••" required autocomplete="current-password"></label>
+          <div class="text-right"><a href="${EYWA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
           <button class="w-full py-3.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold disabled:opacity-50" id="entrar">Iniciar Sesión</button>
         </form>
-        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="https://eywa.encsust4in4ble.earth" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
+        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${EYWA}" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
       </div>
     </div>
     <div class="hidden lg:block lg:w-1/2 relative">
@@ -160,32 +235,62 @@ function login(app) {
     e.preventDefault(); $('#entrar').disabled = true;
     try {
       const d = await api('/auth/login', { method: 'POST', body: datosForm(e.target) });
-      token = d.token; try { sessionStorage.setItem('agro_token', token); } catch {}
-      document.querySelector('header').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
+      token = d.token; guardar('agro_token', token); orgs = [];
       ir('/');
     } catch (err) { $('#msg').innerHTML = aviso(err.message); $('#entrar').disabled = false; }
+  };
+}
+
+// ── Organización: alta (y primera vez) ──
+function nuevaOrganizacion(app) {
+  const primera = !orgs.length;
+  app.innerHTML = `
+  <div class="max-w-xl mx-auto">
+    <h1 class="text-2xl font-light mb-2">${primera ? 'Crea tu organización' : 'Nueva organización'}</h1>
+    <p class="text-sm text-gray-500 mb-5">${primera ? 'Todo en EYWA Agro se registra dentro de una organización: tu cooperativa, asociación o empresa. Tú quedarás como administrador y podrás sumar a tus técnicos de campo.' : 'Quedarás como administrador.'}</p>
+    <div id="msg"></div>
+    <form id="f" class="card space-y-3">
+      <label class="block"><span class="text-sm text-gray-600">Nombre</span><input class="inp mt-1" name="nombre" required placeholder="Cooperativa Agraria …"></label>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <label class="block"><span class="text-sm text-gray-600">Tipo</span><select class="inp mt-1" name="tipo">
+          <option value="cooperativa">Cooperativa</option><option value="asociacion">Asociación de productores</option>
+          <option value="agroindustria">Agroindustria</option><option value="comprador">Comprador / exportador</option><option value="otro">Otro</option></select></label>
+        <label class="block"><span class="text-sm text-gray-600">RUC (opcional)</span><input class="inp mt-1" name="ruc" inputmode="numeric" maxlength="11"></label>
+        <label class="block"><span class="text-sm text-gray-600">Cadena principal</span><input class="inp mt-1" name="cadena" value="cacao"></label>
+        <label class="block"><span class="text-sm text-gray-600">Región</span><input class="inp mt-1" name="region" placeholder="Cusco"></label>
+      </div>
+      <div class="flex gap-2 pt-1">${primera ? '' : '<a data-ir href="/" class="btn2 inline-flex items-center">Cancelar</a>'}<button class="btn">Crear organización</button></div>
+    </form>
+  </div>`;
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const d = await api('/agro/organizaciones', { method: 'POST', body: datosForm(e.target) });
+      guardar('agro_org', d.organizacion.id); orgs = []; ir('/');
+    } catch (err) { $('#msg').innerHTML = aviso(err.message); }
   };
 }
 
 // ── Panel ──
 async function panel(app) {
   const r = await api('/agro/resumen');
-  const kpi = (t, v, s = '') => `<div class="card"><div class="text-2xl font-light">${v}</div><div class="text-xs uppercase tracking-wider text-gray-500">${t}</div>${s ? `<div class="text-xs text-gray-400 mt-1">${s}</div>` : ''}</div>`;
+  const kpi = (t, v, s = '') => `<div class="card !p-4 sm:!p-5"><div class="text-2xl font-light">${v}</div><div class="text-xs uppercase tracking-wider text-gray-500">${t}</div>${s ? `<div class="text-xs text-gray-400 mt-1">${s}</div>` : ''}</div>`;
   app.innerHTML = `
-  <h1 class="text-2xl font-light mb-5">Panel de trazabilidad</h1>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  <div class="flex flex-wrap items-baseline gap-x-3 mb-5"><h1 class="text-2xl font-light">${esc(org.nombre)}</h1>
+    <span class="text-sm text-gray-500">Tu rol: ${esc(etiquetaRol(r.rol))}</span></div>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
     ${kpi('Productores', num(r.productores))}
-    ${kpi('Lotes', num(r.lotes), num(r.hectareas, 2) + ' ha')}
-    ${kpi('Georreferenciados', `${num(r.lotes_georreferenciados)} / ${num(r.lotes)}`, `${num(r.lotes_con_declaracion)} con declaración de no deforestación`)}
+    ${kpi('Parcelas', num(r.lotes), num(r.hectareas, 2) + ' ha')}
+    ${kpi('Georreferenciadas', `${num(r.lotes_georreferenciados)} / ${num(r.lotes)}`, `${num(r.lotes_con_declaracion)} con declaración de no deforestación`)}
     ${kpi('Acopiado', num(r.kilos_acopiados) + ' kg', 'Pagado a productores: USD ' + num(r.pagado_productores, 2))}
   </div>
   <div class="card text-sm text-gray-600">
     <p class="font-medium text-gray-800 mb-2">Cómo funciona</p>
     <ol class="list-decimal ml-5 space-y-1">
-      <li>Registra a cada <b>productor</b> y sus <b>lotes</b> con coordenadas (requisito del reglamento europeo contra la deforestación).</li>
-      <li>Anota las <b>cosechas</b> de cada lote.</li>
+      <li>Registra a cada <b>productor</b> y sus <b>parcelas</b> con coordenadas (requisito del reglamento europeo contra la deforestación). Si son muchos, usa <b>Importar Excel</b>.</li>
+      <li>Anota las <b>cosechas</b> de cada parcela.</li>
       <li>En el <b>acopio</b>, cada saco entregado recibe un código y un QR: es su pasaporte.</li>
-      <li>Al vender, registra la fecha y el precio de referencia: queda calculado lo que le corresponde al productor según el % pactado, y cuándo se le pagó.</li>
+      <li>Al vender, el administrador registra la fecha y el precio de referencia: queda calculado lo que le corresponde al productor según el % pactado, y cuándo se le pagó.</li>
     </ol>
     <p class="text-xs text-gray-400 mt-3">La "no deforestación" es una declaración del productor con fecha; aún no hay verificación satelital.</p>
   </div>
@@ -205,90 +310,83 @@ async function productores(app, msg = '') {
   const { productores: ps } = await api('/agro/productores');
   app.innerHTML = `
   <h1 class="text-2xl font-light mb-5">Productores</h1>${msg}
-  <div class="grid md:grid-cols-3 gap-4">
-    <form id="f" class="card space-y-3 h-fit">
+  <div class="grid lg:grid-cols-3 gap-4">
+    ${puede.escribir() ? `<form id="f" class="card space-y-3 h-fit">
       <div class="font-medium">Nuevo productor</div>
       <input class="inp" name="nombre" placeholder="Nombre completo" required>
-      <input class="inp" name="dni" placeholder="DNI (privado)">
-      <input class="inp" name="comunidad" placeholder="Comunidad / asociación">
-      <input class="inp" name="telefono" placeholder="Teléfono (privado)">
+      <input class="inp" name="dni" placeholder="DNI (privado)" inputmode="numeric" maxlength="8">
+      <input class="inp" name="comunidad" placeholder="Comunidad / sector">
+      <input class="inp" name="telefono" placeholder="Teléfono (privado)" inputmode="tel">
       <button class="btn w-full">Guardar</button>
       <p class="text-[11px] text-gray-400">El DNI, el teléfono y el nombre completo nunca aparecen en el pasaporte público.</p>
-    </form>
-    <div class="card md:col-span-2 overflow-x-auto">
-      ${ps.length ? `<table class="w-full"><tr><th>Nombre</th><th>Comunidad</th><th>Lotes</th><th></th></tr>
-        ${ps.map((p) => `<tr><td>${esc(p.nombre)}<div class="text-xs text-gray-400">${esc(p.dni || '')}</div></td><td>${esc(p.comunidad || '—')}</td><td>${p.lotes}</td>
-        <td class="text-right"><button class="btn2" data-del="${p.id}">Eliminar</button></td></tr>`).join('')}</table>`
-        : '<p class="text-sm text-gray-500">Aún no hay productores.</p>'}
+    </form>` : ''}
+    <div class="card rt-wrap ${puede.escribir() ? 'lg:col-span-2' : 'lg:col-span-3'}">
+      ${tabla(['Nombre', 'DNI', 'Comunidad', 'Parcelas', ''], ps.map((p) => [
+        esc(p.nombre), esc(p.dni || '—'), esc(p.comunidad || '—'), p.lotes,
+        puede.admin() ? `<button class="btn2" data-del="${p.id}">Eliminar</button>` : '']), 'Aún no hay productores.')}
     </div>
   </div>`;
-  $('#f').onsubmit = async (e) => {
+  const f = $('#f');
+  if (f) f.onsubmit = async (e) => {
     e.preventDefault();
-    try { await api('/agro/productores', { method: 'POST', body: datosForm(e.target) }); await productores(app, aviso('Productor guardado', 'ok')); }
+    try { await api('/agro/productores', { method: 'POST', body: datosForm(f) }); await productores(app, aviso('Productor guardado', 'ok')); }
     catch (err) { await productores(app, aviso(err.message)); }
   };
   app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
-    if (!confirm('¿Eliminar al productor con todos sus lotes, cosechas y entregas?')) return;
+    if (!confirm('¿Eliminar al productor con todas sus parcelas, cosechas y entregas?')) return;
     try { await api('/agro/productores/' + b.dataset.del, { method: 'DELETE' }); await productores(app); } catch (err) { alert(err.message); }
   });
 }
 
-// ── Lotes ──
+// ── Parcelas ──
 async function lotes(app, msg = '') {
   const [{ productores: ps }, { lotes: ls }] = await Promise.all([api('/agro/productores'), api('/agro/lotes')]);
-  app.innerHTML = `
-  <h1 class="text-2xl font-light mb-5">Lotes</h1>${msg}
-  ${!ps.length ? aviso('Primero registra un productor.', 'ok') : `
-  <form id="f" class="card mb-5 grid md:grid-cols-4 gap-3">
-    <div class="md:col-span-4 font-medium">Nuevo lote</div>
+  const form = !puede.escribir() ? '' : !ps.length ? aviso('Primero registra un productor o importa un Excel.', 'ok') : `
+  <form id="f" class="card mb-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="sm:col-span-2 lg:col-span-4 font-medium">Nueva parcela</div>
     <select class="inp" name="productor_id" required>${ps.map((p) => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('')}</select>
-    <input class="inp" name="nombre" placeholder="Nombre del lote" required>
-    <input class="inp" name="cultivo" placeholder="Cultivo (cacao)">
-    <input class="inp" name="variedad" placeholder="Variedad (CCN-51, nativo…)">
+    <input class="inp" name="nombre" placeholder="Nombre de la parcela" required>
+    <input class="inp" name="cultivo" placeholder="Cultivo" value="${esc(org.cadena || 'cacao')}">
+    <input class="inp" name="variedad" placeholder="Variedad (Chuncho, CCN-51…)">
     <input class="inp" name="hectareas" data-num type="number" step="0.01" min="0" placeholder="Hectáreas">
     <input class="inp" name="departamento" placeholder="Departamento">
     <input class="inp" name="provincia" placeholder="Provincia">
     <input class="inp" name="distrito" placeholder="Distrito">
-    <input class="inp" name="latitud" data-num type="number" step="any" placeholder="Latitud (ej. -8.3791)">
-    <input class="inp" name="longitud" data-num type="number" step="any" placeholder="Longitud (ej. -74.5539)">
-    <button type="button" id="gps" class="btn2">Usar mi ubicación (GPS)</button>
-    <label class="md:col-span-4 flex gap-2 items-start text-sm"><input type="checkbox" name="sin_deforestacion" class="mt-1 accent-emerald-600">
-      <span>El productor declara que este lote <b>no proviene de deforestación</b> posterior al 31-12-2020. Queda registrado como declaración con fecha.</span></label>
-    <button class="btn md:col-span-1">Guardar lote</button>
-  </form>`}
-  <div class="card overflow-x-auto">
-    ${ls.length ? `<table class="w-full"><tr><th>Lote</th><th>Productor</th><th>Ubicación</th><th>ha</th><th>Cosechado</th><th>Pasaporte</th><th></th></tr>
-    ${ls.map((l) => `<tr>
-      <td>${esc(l.nombre)}<div class="text-xs text-gray-400">${esc(l.cultivo)} ${esc(l.variedad || '')}</div></td>
-      <td>${esc(l.productor)}</td>
-      <td>${esc([l.distrito, l.provincia].filter(Boolean).join(', ') || '—')}
-        <div class="text-xs ${l.latitud != null ? 'text-emerald-700' : 'text-amber-700'}">${l.latitud != null ? '✓ georreferenciado' : 'sin coordenadas'}</div>
-        <div class="text-xs ${l.sin_deforestacion ? 'text-emerald-700' : 'text-gray-400'}">${l.sin_deforestacion ? '✓ declaración no deforestación' : 'sin declaración'}</div></td>
-      <td>${num(l.hectareas, 2)}</td>
-      <td>${num(l.kilos_cosechados)} kg</td>
-      <td><a class="text-emerald-700 underline text-xs" href="/p/${esc(l.codigo)}" target="_blank">${esc(l.codigo)}</a></td>
-      <td class="text-right whitespace-nowrap"><button class="btn2" data-cos="${l.id}">+ Cosecha</button> <button class="btn2" data-del="${l.id}">Eliminar</button></td>
-    </tr>`).join('')}</table>` : '<p class="text-sm text-gray-500">Aún no hay lotes.</p>'}
-  </div>`;
+    <input class="inp" name="latitud" data-num type="number" step="any" placeholder="Latitud (-12.6134)">
+    <input class="inp" name="longitud" data-num type="number" step="any" placeholder="Longitud (-72.9421)">
+    <button type="button" id="gps" class="btn2">📍 Usar mi ubicación (GPS)</button>
+    <label class="sm:col-span-2 lg:col-span-4 flex gap-2 items-start text-sm"><input type="checkbox" name="sin_deforestacion" class="mt-1 accent-emerald-600 w-4 h-4 shrink-0">
+      <span>El productor declara que esta parcela <b>no proviene de deforestación</b> posterior al 31-12-2020. Queda registrado como declaración con fecha.</span></label>
+    <button class="btn">Guardar parcela</button>
+  </form>`;
+  app.innerHTML = `<h1 class="text-2xl font-light mb-5">Parcelas</h1>${msg}${form}
+  <div class="card rt-wrap">${tabla(['Parcela', 'Productor', 'Ubicación', 'ha', 'Cosechado', 'Pasaporte', ''], ls.map((l) => [
+    `${esc(l.nombre)}<div class="text-xs text-gray-400">${esc(l.cultivo)} ${esc(l.variedad || '')}</div>`,
+    esc(l.productor),
+    `${esc([l.distrito, l.provincia].filter(Boolean).join(', ') || '—')}
+      <div class="text-xs ${l.latitud != null ? 'text-emerald-700' : 'text-amber-700'}">${l.latitud != null ? '✓ georreferenciada' : 'sin coordenadas'}</div>
+      <div class="text-xs ${l.sin_deforestacion ? 'text-emerald-700' : 'text-gray-400'}">${l.sin_deforestacion ? '✓ declaración no deforestación' : 'sin declaración'}</div>`,
+    num(l.hectareas, 2), num(l.kilos_cosechados) + ' kg',
+    `<a class="text-emerald-700 underline text-xs" href="/p/${esc(l.codigo)}" target="_blank">${esc(l.codigo)}</a>`,
+    (puede.escribir() ? `<button class="btn2" data-cos="${l.id}">+ Cosecha</button> ` : '') + (puede.admin() ? `<button class="btn2" data-del="${l.id}">Eliminar</button>` : ''),
+  ]), 'Aún no hay parcelas.')}</div>`;
   const f = $('#f');
   if (f) {
     $('#gps').onclick = () => navigator.geolocation?.getCurrentPosition(
       (pos) => { f.latitud.value = pos.coords.latitude.toFixed(6); f.longitud.value = pos.coords.longitude.toFixed(6); },
-      () => alert('No se pudo obtener la ubicación'));
+      () => alert('No se pudo obtener la ubicación'), { enableHighAccuracy: true, timeout: 15000 });
     f.onsubmit = async (e) => {
       e.preventDefault();
-      try { await api('/agro/lotes', { method: 'POST', body: datosForm(f) }); await lotes(app, aviso('Lote guardado con su pasaporte', 'ok')); }
+      try { await api('/agro/lotes', { method: 'POST', body: datosForm(f) }); await lotes(app, aviso('Parcela guardada con su pasaporte', 'ok')); }
       catch (err) { await lotes(app, aviso(err.message)); }
     };
   }
-  app.querySelectorAll('[data-cos]').forEach((b) => b.onclick = async () => {
-    const kilos = prompt('Kilos cosechados:'); if (!kilos) return;
-    const fecha = prompt('Fecha (AAAA-MM-DD):', hoy()); if (!fecha) return;
-    try { await api(`/agro/lotes/${b.dataset.cos}/cosechas`, { method: 'POST', body: { kilos: Number(kilos), fecha } }); await lotes(app, aviso('Cosecha registrada', 'ok')); }
-    catch (err) { alert(err.message); }
-  });
+  app.querySelectorAll('[data-cos]').forEach((b) => b.onclick = () => modal('Registrar cosecha', [
+    { n: 'kilos', t: 'Kilos cosechados', tipo: 'number', num: true, req: true, min: 0 },
+    { n: 'fecha', t: 'Fecha', tipo: 'date', v: hoy(), req: true },
+  ], async (d) => { await api(`/agro/lotes/${b.dataset.cos}/cosechas`, { method: 'POST', body: d }); await lotes(app, aviso('Cosecha registrada', 'ok')); }));
   app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
-    if (!confirm('¿Eliminar el lote con sus cosechas y entregas?')) return;
+    if (!confirm('¿Eliminar la parcela con sus cosechas y entregas?')) return;
     try { await api('/agro/lotes/' + b.dataset.del, { method: 'DELETE' }); await lotes(app); } catch (err) { alert(err.message); }
   });
 }
@@ -296,54 +394,151 @@ async function lotes(app, msg = '') {
 // ── Acopio ──
 async function acopio(app, msg = '') {
   const [{ lotes: ls }, { entregas: es }] = await Promise.all([api('/agro/lotes'), api('/agro/entregas')]);
-  app.innerHTML = `
-  <h1 class="text-2xl font-light mb-5">Centro de acopio digital</h1>${msg}
-  ${!ls.length ? aviso('Primero registra un lote.', 'ok') : `
-  <form id="f" class="card mb-5 grid md:grid-cols-5 gap-3">
-    <div class="md:col-span-5 font-medium">Registrar entrega (saco)</div>
-    <select class="inp md:col-span-2" name="lote_id" required>${ls.map((l) => `<option value="${l.id}">${esc(l.nombre)} · ${esc(l.productor)}</option>`).join('')}</select>
+  const form = !puede.escribir() ? '' : !ls.length ? aviso('Primero registra una parcela.', 'ok') : `
+  <form id="f" class="card mb-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <div class="sm:col-span-2 lg:col-span-5 font-medium">Registrar entrega (saco)</div>
+    <select class="inp sm:col-span-2" name="lote_id" required>${ls.map((l) => `<option value="${l.id}">${esc(l.nombre)} · ${esc(l.productor)}</option>`).join('')}</select>
     <input class="inp" name="fecha_entrega" type="date" value="${hoy()}" required>
     <input class="inp" name="kilos" data-num type="number" step="0.1" min="0" placeholder="Kilos" required>
     <input class="inp" name="porcentaje_pactado" data-num type="number" step="0.1" min="0" max="100" placeholder="% pactado">
-    <input class="inp md:col-span-2" name="calidad" placeholder="Calidad (fermentado, humedad…)">
+    <input class="inp sm:col-span-2" name="calidad" placeholder="Calidad (fermentado, humedad…)">
     <button class="btn">Registrar y generar QR</button>
-  </form>`}
-  <div class="card overflow-x-auto">
-    ${es.length ? `<table class="w-full"><tr><th>Saco</th><th>Lote</th><th>Entrega</th><th>Venta</th><th>Al productor</th><th></th></tr>
-    ${es.map((e) => `<tr>
-      <td><a class="text-emerald-700 underline" href="/p/${esc(e.codigo)}" target="_blank">${esc(e.codigo)}</a></td>
-      <td>${esc(e.lote)}<div class="text-xs text-gray-400">${esc(e.productor)}</div></td>
-      <td>${esc(e.fecha_entrega)}<div class="text-xs text-gray-400">${num(e.kilos, 1)} kg${e.calidad ? ' · ' + esc(e.calidad) : ''}</div></td>
-      <td>${e.fecha_venta ? `${esc(e.fecha_venta)}<div class="text-xs text-gray-400">USD ${num(e.precio_referencia, 2)}/t · ${num(e.porcentaje_pactado, 1)} %</div>` : '<span class="text-xs text-gray-400">sin vender</span>'}</td>
-      <td>${e.monto_productor != null ? `USD ${num(e.monto_productor, 2)}<div class="text-xs ${e.pagado_at ? 'text-emerald-700' : 'text-amber-700'}">${e.pagado_at ? '✓ pagado' : 'pendiente de pago'}</div>` : '—'}</td>
-      <td class="text-right whitespace-nowrap">
-        ${!e.fecha_venta ? `<button class="btn2" data-venta="${e.id}" data-pct="${e.porcentaje_pactado ?? ''}">Registrar venta</button>` : ''}
-        ${e.monto_productor != null && !e.pagado_at ? `<button class="btn2" data-pago="${e.id}">Marcar pagado</button>` : ''}
-      </td></tr>`).join('')}</table>` : '<p class="text-sm text-gray-500">Aún no hay entregas.</p>'}
-  </div>`;
+  </form>`;
+  app.innerHTML = `<h1 class="text-2xl font-light mb-5">Centro de acopio digital</h1>${msg}${form}
+  <div class="card rt-wrap">${tabla(['Saco', 'Parcela', 'Entrega', 'Venta', 'Al productor', ''], es.map((e) => [
+    `<a class="text-emerald-700 underline" href="/p/${esc(e.codigo)}" target="_blank">${esc(e.codigo)}</a>`,
+    `${esc(e.lote)}<div class="text-xs text-gray-400">${esc(e.productor)}</div>`,
+    `${esc(e.fecha_entrega)}<div class="text-xs text-gray-400">${num(e.kilos, 1)} kg${e.calidad ? ' · ' + esc(e.calidad) : ''}</div>`,
+    e.fecha_venta ? `${esc(e.fecha_venta)}<div class="text-xs text-gray-400">USD ${num(e.precio_referencia, 2)}/t · ${num(e.porcentaje_pactado, 1)} %</div>` : '<span class="text-xs text-gray-400">sin vender</span>',
+    e.monto_productor != null ? `USD ${num(e.monto_productor, 2)}<div class="text-xs ${e.pagado_at ? 'text-emerald-700' : 'text-amber-700'}">${e.pagado_at ? '✓ pagado' : 'pendiente de pago'}</div>` : '—',
+    !puede.admin() ? '' : (!e.fecha_venta ? `<button class="btn2" data-venta="${e.id}" data-pct="${e.porcentaje_pactado ?? ''}">Registrar venta</button>` : '')
+      + (e.monto_productor != null && !e.pagado_at ? `<button class="btn2" data-pago="${e.id}">Marcar pagado</button>` : ''),
+  ]), 'Aún no hay entregas.')}</div>`;
   const f = $('#f');
   if (f) f.onsubmit = async (e) => {
     e.preventDefault();
     try { const d = await api('/agro/entregas', { method: 'POST', body: datosForm(f) }); await acopio(app, aviso(`Saco ${d.entrega.codigo} registrado. Su pasaporte: /p/${d.entrega.codigo}`, 'ok')); }
     catch (err) { await acopio(app, aviso(err.message)); }
   };
-  app.querySelectorAll('[data-venta]').forEach((b) => b.onclick = async () => {
-    const fecha_venta = prompt('Fecha de venta (AAAA-MM-DD):', hoy()); if (!fecha_venta) return;
-    const precio = prompt('Precio de referencia ese día (USD por tonelada):'); if (!precio) return;
-    const pct = prompt('% pactado con el productor:', b.dataset.pct); if (!pct) return;
-    try { await api(`/agro/entregas/${b.dataset.venta}/venta`, { method: 'POST', body: { fecha_venta, precio_referencia: Number(precio), porcentaje_pactado: Number(pct) } }); await acopio(app, aviso('Venta registrada', 'ok')); }
-    catch (err) { alert(err.message); }
-  });
+  app.querySelectorAll('[data-venta]').forEach((b) => b.onclick = () => modal('Registrar venta', [
+    { n: 'fecha_venta', t: 'Fecha de venta', tipo: 'date', v: hoy(), req: true },
+    { n: 'precio_referencia', t: 'Precio de referencia ese día (USD por tonelada)', tipo: 'number', num: true, req: true, min: 0 },
+    { n: 'porcentaje_pactado', t: '% pactado con el productor', tipo: 'number', num: true, req: true, min: 0, max: 100, v: b.dataset.pct },
+  ], async (d) => { await api(`/agro/entregas/${b.dataset.venta}/venta`, { method: 'POST', body: d }); await acopio(app, aviso('Venta registrada', 'ok')); }));
   app.querySelectorAll('[data-pago]').forEach((b) => b.onclick = async () => {
     if (!confirm('¿Confirmas que se pagó al productor?')) return;
     try { await api(`/agro/entregas/${b.dataset.pago}/pagado`, { method: 'POST' }); await acopio(app); } catch (err) { alert(err.message); }
   });
 }
 
-// ══ Módulos reciclados de EYWA (misma API, misma cuenta) ═══════════════════════
-const EYWA = 'https://eywa.encsust4in4ble.earth';
+// ── Equipo ──
+async function equipo(app, msg = '') {
+  const { miembros } = await api('/agro/miembros');
+  const opcionesRol = (sel) => ['admin', 'tecnico', 'lector'].map((r) => `<option value="${r}" ${r === sel ? 'selected' : ''}>${etiquetaRol(r)}</option>`).join('');
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-1">Equipo de ${esc(org.nombre)}</h1>
+  <p class="text-sm text-gray-500 mb-5">Administrador: todo, incluidas ventas, pagos y el equipo. Técnico de campo: registra productores, parcelas, cosechas y entregas. Lector: solo consulta.</p>${msg}
+  <div class="grid lg:grid-cols-3 gap-4">
+    ${puede.admin() ? `<form id="f" class="card space-y-3 h-fit">
+      <div class="font-medium">Sumar a alguien</div>
+      <input class="inp" name="email" type="email" placeholder="Correo de su cuenta de EYWA" required>
+      <select class="inp" name="rol">${opcionesRol('tecnico')}</select>
+      <button class="btn w-full">Agregar</button>
+      <p class="text-[11px] text-gray-400">Necesita una cuenta de EYWA (es la misma para agro). Si no la tiene, que se registre en eywa.encsust4in4ble.earth.</p>
+    </form>` : ''}
+    <div class="card rt-wrap ${puede.admin() ? 'lg:col-span-2' : 'lg:col-span-3'}">
+      ${tabla(['Persona', 'Rol', ''], miembros.map((m) => [
+        `${esc(m.nombre || m.email)}<div class="text-xs text-gray-400">${esc(m.email)}</div>`,
+        puede.admin() ? `<select class="inp !py-1 !text-sm w-auto" data-rol="${m.id}">${opcionesRol(m.rol)}</select>` : esc(etiquetaRol(m.rol)),
+        puede.admin() ? `<button class="btn2" data-quitar="${m.id}">Quitar</button>` : '',
+      ]), 'Sin miembros.')}
+    </div>
+  </div>`;
+  const f = $('#f');
+  if (f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/agro/miembros', { method: 'POST', body: datosForm(f) }); await equipo(app, aviso('Agregado al equipo', 'ok')); }
+    catch (err) { await equipo(app, aviso(err.message)); }
+  };
+  app.querySelectorAll('[data-rol]').forEach((s) => s.onchange = async () => {
+    try { await api('/agro/miembros/' + s.dataset.rol, { method: 'PATCH', body: { rol: s.value } }); orgs = []; await equipo(app, aviso('Rol actualizado', 'ok')); }
+    catch (err) { await equipo(app, aviso(err.message)); }
+  });
+  app.querySelectorAll('[data-quitar]').forEach((b) => b.onclick = async () => {
+    if (!confirm('¿Quitar a esta persona de la organización?')) return;
+    try { await api('/agro/miembros/' + b.dataset.quitar, { method: 'DELETE' }); orgs = []; await equipo(app, aviso('Quitado del equipo', 'ok')); }
+    catch (err) { await equipo(app, aviso(err.message)); }
+  });
+}
 
-// Fondos: el mismo catálogo de EYWA (con su verificador nocturno), filtrado a agro.
+// ── Importar Excel ──
+// Columnas de la plantilla. Se aceptan sinónimos y mayúsculas/tildes indistintas.
+const COLUMNAS = ['productor', 'dni', 'comunidad', 'telefono', 'lote', 'cultivo', 'variedad', 'hectareas',
+  'departamento', 'provincia', 'distrito', 'latitud', 'longitud', 'sin_deforestacion'];
+const SINONIMOS = { nombre: 'productor', nombre_productor: 'productor', productor_nombre: 'productor', parcela: 'lote', nombre_lote: 'lote',
+  nombre_parcela: 'lote', ha: 'hectareas', area: 'hectareas', lat: 'latitud', lon: 'longitud', lng: 'longitud', long: 'longitud',
+  celular: 'telefono', no_deforestacion: 'sin_deforestacion', declara_no_deforestacion: 'sin_deforestacion', deforestacion: 'sin_deforestacion' };
+const normCol = (k) => { const c = String(k).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); return SINONIMOS[c] || c; };
+
+function descargarPlantilla() {
+  const ejemplo = { productor: 'María Quispe Huamán', dni: '40123456', comunidad: 'Kepashiato', telefono: '987654321', lote: 'Parcela El Mirador',
+    cultivo: org.cadena || 'cacao', variedad: 'Chuncho', hectareas: 1.5, departamento: 'Cusco', provincia: 'La Convención', distrito: 'Megantoni',
+    latitud: -12.6134, longitud: -72.9421, sin_deforestacion: 'sí' };
+  const ws = XLSX.utils.json_to_sheet([ejemplo], { header: COLUMNAS });
+  ws['!cols'] = COLUMNAS.map(() => ({ wch: 16 }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'productores_parcelas');
+  XLSX.writeFile(wb, 'plantilla_eywa_agro.xlsx');
+}
+
+function importar(app) {
+  app.innerHTML = `
+  <h1 class="text-2xl font-light mb-1">Importar productores y parcelas</h1>
+  <p class="text-sm text-gray-500 mb-5">Una fila por parcela. Si un productor tiene varias parcelas, repite su nombre y DNI. Se valida todo antes de guardar: si hay errores, no se guarda nada y verás qué corregir.</p>
+  <div class="grid lg:grid-cols-3 gap-4">
+    <div class="card space-y-3 h-fit">
+      <div class="font-medium">1 · Plantilla</div>
+      <p class="text-sm text-gray-600">Columnas: ${COLUMNAS.map((c) => `<code class="text-xs bg-gray-100 rounded px-1">${c}</code>`).join(' ')}</p>
+      <p class="text-xs text-gray-500">Obligatorias: productor y lote. El DNI evita duplicados. "sin_deforestacion": sí / no.</p>
+      <button id="plantilla" class="btn2">Descargar plantilla (.xlsx)</button>
+      <div class="font-medium pt-2">2 · Tu archivo</div>
+      <input id="arch" type="file" accept=".xlsx,.xls,.csv" class="block w-full text-sm file:mr-3 file:btn2 file:border file:border-gray-200 file:rounded-lg file:bg-white file:px-3 file:py-2">
+    </div>
+    <div class="card lg:col-span-2" id="res"><p class="text-sm text-gray-500">Elige un archivo para revisarlo.</p></div>
+  </div>`;
+  $('#plantilla').onclick = () => (window.XLSX ? descargarPlantilla() : alert('Cargando… intenta de nuevo en unos segundos'));
+  let filas = [];
+  $('#arch').onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    if (!window.XLSX) return alert('Cargando el lector de Excel… intenta de nuevo');
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const crudas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true });
+      filas = crudas.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [normCol(k), v])))
+        .filter((r) => Object.values(r).some((v) => String(v).trim() !== ''));
+      const desconocidas = [...new Set(crudas.flatMap((r) => Object.keys(r)).map(normCol))].filter((c) => !COLUMNAS.includes(c) && !c.startsWith('empty'));
+      await validar(true, desconocidas);
+    } catch (err) { $('#res').innerHTML = aviso('No se pudo leer el archivo: ' + err.message); }
+  };
+  async function validar(simular, desconocidas = []) {
+    $('#res').innerHTML = '<p class="text-sm text-gray-400">Revisando…</p>';
+    const { status, d } = await api('/agro/importar', { method: 'POST', body: { filas, simular }, aceptar: [422], conEstado: true });
+    const r = d.resumen || {};
+    const cifras = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      ${[['Filas', r.filas], ['Productores nuevos', r.productores_nuevos], ['Ya existentes', r.productores_existentes], ['Parcelas nuevas', r.lotes_nuevos]]
+        .map(([t, v]) => `<div class="bg-gray-50 rounded-lg p-3"><div class="text-xl font-light">${num(v)}</div><div class="text-[11px] uppercase text-gray-500">${t}</div></div>`).join('')}</div>`;
+    const ignoradas = desconocidas.length ? `<p class="text-xs text-amber-700 mb-3">Columnas que no se usan: ${desconocidas.map(esc).join(', ')}</p>` : '';
+    if (status === 422) {
+      $('#res').innerHTML = aviso(`Hay ${d.errores.length} fila(s) con errores. No se guardó nada.`) + cifras + ignoradas
+        + `<div class="rt-wrap">${tabla(['Fila', 'Error'], d.errores.slice(0, 200).map((x) => [x.fila, esc(x.mensaje)]), '')}</div>`;
+      return;
+    }
+    if (d.guardado) { orgs = []; $('#res').innerHTML = aviso(`Listo: se guardaron ${r.lotes_nuevos} parcelas y ${r.productores_nuevos} productores nuevos.`, 'ok') + cifras + '<a data-ir href="/lotes" class="btn inline-block">Ver parcelas</a>'; return; }
+    $('#res').innerHTML = aviso('El archivo está correcto. Revisa las cifras y confirma.', 'ok') + cifras + ignoradas + '<button id="conf" class="btn">Importar ahora</button>';
+    $('#conf').onclick = () => validar(false, desconocidas).catch((err) => { $('#res').innerHTML = aviso(err.message); });
+  }
+}
+
+// ══ Módulos reciclados de EYWA (misma API, misma cuenta) ═══════════════════════
 async function fondos(app) {
   const r = await fetch('/api/funds', { headers: { Authorization: 'Bearer ' + token } });
   if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-light mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de EYWA.', 'ok'); return; }
@@ -354,30 +549,28 @@ async function fondos(app) {
   app.innerHTML = `
   <h1 class="text-2xl font-light mb-1">Fondos para agro</h1>
   <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de EYWA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
-  <div class="card overflow-x-auto"><table class="w-full"><tr><th>Fondo</th><th>Instrumento</th><th>Monto</th><th>Cierre</th></tr>
-  ${agro.sort((a, b) => vig(b) - vig(a)).map((f) => `<tr class="${vig(f) ? '' : 'opacity-50'}">
-    <td>${f.url ? `<a class="text-emerald-700 underline" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}
-      <div class="text-xs text-gray-400">${esc(f.scope)}${f.verify_status === 'enlace_roto' ? ' · enlace por verificar' : ''}</div></td>
-    <td>${esc(f.instrument_type)}</td><td class="text-xs">${esc(f.amounts || '—')}</td>
-    <td class="text-xs">${f.deadline ? esc(f.deadline.slice(0, 10)) + (vig(f) ? '' : ' (cerrado)') : esc(f.deadline_text || '—')}</td></tr>`).join('')}
-  </table></div>`;
+  <div class="card rt-wrap">${tabla(['Fondo', 'Instrumento', 'Monto', 'Cierre'], agro.sort((a, b) => vig(b) - vig(a)).map((f) => [
+    `${f.url ? `<a class="text-emerald-700 underline" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}
+      <div class="text-xs text-gray-400">${esc(f.scope)}${f.verify_status === 'enlace_roto' ? ' · enlace por verificar' : ''}</div>`,
+    esc(f.instrument_type), `<span class="text-xs">${esc(f.amounts || '—')}</span>`,
+    `<span class="text-xs ${vig(f) ? '' : 'text-gray-400'}">${f.deadline ? esc(f.deadline.slice(0, 10)) + (vig(f) ? '' : ' (cerrado)') : esc(f.deadline_text || '—')}</span>`,
+  ]), 'No hay fondos de agro en el catálogo.')}</div>`;
 }
 
-// Actores: el directorio de inversión de impacto de EYWA (capa pública, sin datos de contacto).
 async function actores(app) {
-  const d = await api('/public/v1/actores?por_pagina=100&q=' + encodeURIComponent(new URLSearchParams(location.search).get('q') || ''));
+  const q = new URLSearchParams(location.search).get('q') || '';
+  const d = await api('/public/v1/actores?por_pagina=100&q=' + encodeURIComponent(q));
   app.innerHTML = `
   <h1 class="text-2xl font-light mb-1">Actores del ecosistema</h1>
   <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de EYWA).</p>
-  <form class="mb-4 flex gap-2" onsubmit="event.preventDefault(); ir('/actores?q=' + encodeURIComponent(this.q.value))">
-    <input class="inp" name="q" placeholder="Buscar: cacao, agro, café, cooperativa…" value="${esc(new URLSearchParams(location.search).get('q') || '')}"><button class="btn">Buscar</button></form>
+  <form id="fq" class="mb-4 flex gap-2"><input class="inp" name="q" placeholder="Buscar: cacao, agro, café, cooperativa…" value="${esc(q)}"><button class="btn shrink-0">Buscar</button></form>
   <div class="grid md:grid-cols-2 gap-3">${d.actores.map((a) => `<div class="card !p-4">
     <div class="font-medium">${a.web ? `<a class="hover:text-emerald-700" href="${esc(a.web.startsWith('http') ? a.web : 'https://' + a.web)}" target="_blank" rel="noopener">${esc(a.nombre)}</a>` : esc(a.nombre)}</div>
     <div class="text-xs text-gray-500">${esc(a.pais)} · ${esc(a.categoria.replace(/_/g, ' '))}</div>
     ${a.descripcion ? `<p class="text-sm text-gray-600 mt-1">${esc(a.descripcion.slice(0, 220))}${a.descripcion.length > 220 ? '…' : ''}</p>` : ''}</div>`).join('')}</div>`;
+  $('#fq').onsubmit = (e) => { e.preventDefault(); ir('/actores?q=' + encodeURIComponent(e.target.q.value)); };
 }
 
-// Glosario: la misma fuente que la Academia de EYWA.
 async function glosario(app) {
   const d = await api('/public/v1/glosario');
   const cats = [...new Set(d.terminos.map((t) => t.categoria))].sort((a, b) => (a === 'Agro' ? -1 : b === 'Agro' ? 1 : 0));
@@ -391,26 +584,27 @@ async function glosario(app) {
 
 // ── Pasaporte público ──
 async function pasaporte(app, cod) {
+  $('#cab').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
   app.innerHTML = '<p class="text-sm text-gray-400">Cargando pasaporte…</p>';
   let d;
   try { d = await api(cod.startsWith('SC') ? '/agro/publico/saco/' + cod : '/agro/publico/lote/' + cod); }
   catch (e) { app.innerHTML = aviso('Pasaporte no encontrado: ' + cod); return; }
   const l = d.lote, s = d.saco;
-  const fila = (k, v) => `<div class="flex justify-between gap-4 py-1.5 border-b border-gray-100 text-sm"><span class="text-gray-500">${k}</span><span class="text-right">${v}</span></div>`;
+  const fila = (k, v) => `<div class="flex justify-between gap-4 py-2 border-b border-gray-100 text-sm"><span class="text-gray-500 shrink-0">${k}</span><span class="text-right break-words">${v}</span></div>`;
   app.innerHTML = `
   <div class="max-w-2xl mx-auto card">
-    <div class="flex items-start justify-between gap-4">
-      <div><div class="text-xs uppercase tracking-widest text-emerald-700 font-semibold">Pasaporte digital · ${s ? 'saco' : 'lote'}</div>
-        <h1 class="text-2xl font-light mt-1">${esc(s ? s.codigo : l.nombre)}</h1>
+    <div class="flex flex-col-reverse sm:flex-row items-start justify-between gap-4">
+      <div class="min-w-0"><div class="text-xs uppercase tracking-widest text-emerald-700 font-semibold">Pasaporte digital · ${s ? 'saco' : 'parcela'}</div>
+        <h1 class="text-2xl font-light mt-1 break-words">${esc(s ? s.codigo : l.nombre)}</h1>
         <div class="text-sm text-gray-500">${esc(l.cultivo)} ${esc(l.variedad || '')} · ${esc(l.ubicacion || 'ubicación no registrada')}</div></div>
-      <div id="qr" class="shrink-0"></div>
+      <div id="qr" class="shrink-0 self-center sm:self-start"></div>
     </div>
     <div class="mt-5">
       ${s ? fila('Entregado en acopio', `${esc(s.fecha_entrega)} · ${num(s.kilos, 1)} kg${s.calidad ? ' · ' + esc(s.calidad) : ''}`)
          + fila('Vendido', s.fecha_venta ? `${esc(s.fecha_venta)} · USD ${num(s.precio_referencia, 2)}/t` : 'aún no')
          + fila('Pactado con el productor', s.porcentaje_pactado != null ? num(s.porcentaje_pactado, 1) + ' % del precio' : '—')
          + fila('Recibió el productor', s.monto_productor != null ? `USD ${num(s.monto_productor, 2)} ${s.pagado ? '✓ pagado' : '(pendiente)'}` : '—') : ''}
-      ${fila('Lote de origen', `${esc(l.nombre)} (${esc(l.codigo)})`)}
+      ${fila('Parcela de origen', `${esc(l.nombre)} (${esc(l.codigo)})`)}
       ${fila('Productor', `${esc(l.productor.iniciales)}${l.productor.comunidad ? ' · ' + esc(l.productor.comunidad) : ''}`)}
       ${fila('Superficie', l.hectareas != null ? num(l.hectareas, 2) + ' ha' : '—')}
       ${fila('Coordenadas', l.coordenadas ? `${l.coordenadas.lat}, ${l.coordenadas.lng} <span class="text-xs text-gray-400">(±100 m)</span>` : 'no registradas')}
@@ -422,6 +616,7 @@ async function pasaporte(app, cod) {
   if (window.QRCode) new QRCode($('#qr'), { text: location.href, width: 96, height: 96, colorDark: '#065f46' });
 }
 
+window.addEventListener('resize', () => { if (window.innerWidth >= 1024) $('#nav').classList.remove('hidden'); });
 render();
 </script>
 </body>
