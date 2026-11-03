@@ -403,7 +403,8 @@ interface Fila {
 
 function leerFila(f: Record<string, unknown>): { fila?: Fila; error?: string } {
   const productor = aTexto(f.productor), lote = aTexto(f.lote);
-  if (!productor || productor.length < 2) return { error: 'falta el nombre del productor' };
+  if (!productor) return { error: 'falta el nombre del productor' };
+  if (productor.length < 2) return { error: `el nombre del productor "${productor}" es demasiado corto` };
   if (!lote) return { error: 'falta el nombre del lote' };
   const nums: Record<string, number | null> = {};
   for (const k of ['hectareas', 'latitud', 'longitud']) {

@@ -59,7 +59,7 @@
       <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain shrink-0">
       <span class="leading-tight hidden sm:block"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
       <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
-      <span class="font-extrabold sm:hidden">EYWA <span class="text-emerald-600">AGRO</span></span>
+      <span class="font-extrabold sm:hidden whitespace-nowrap text-[15px]">EYWA <span class="text-emerald-600">AGRO</span></span>
     </a>
     <div id="orgsel" class="ml-auto min-w-0"></div>
     <button id="hamb" class="lg:hidden btn2 shrink-0" aria-label="Menú" aria-expanded="false">☰</button>
@@ -144,7 +144,7 @@ function datosForm(f) {
 function tabla(cols, filas, vacio) {
   if (!filas.length) return `<p class="text-sm text-gray-500">${vacio}</p>`;
   return `<table class="rt"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>
-    ${filas.map((f) => `<tr>${f.map((v, i) => (cols[i] === '' ? `<td class="acc">${v}</td>` : `<td data-l="${cols[i]}">${v}</td>`)).join('')}</tr>`).join('')}</tbody></table>`;
+    ${filas.map((f) => `<tr>${f.map((v, i) => (cols[i] === '' ? `<td class="acc">${v}</td>` : `<td data-l="${cols[i]}"><div>${v}</div></td>`)).join('')}</tr>`).join('')}</tbody></table>`;
 }
 // Ventana con formulario (reemplaza a prompt(), que en el celular se ve mal).
 function modal(titulo, campos, alEnviar) {
@@ -175,6 +175,9 @@ async function render() {
   if (pub) { cabecera(); return pasaporte(app, pub[1].toUpperCase()); }
   if (!token) { cabecera(); return login(app); }
   $('#cab').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
+  // Indicador de carga: con la conexión de campo, una pantalla en blanco parece un error.
+  app.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-400 py-10 justify-center"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Cargando…</div>';
+  cerrarMenu();
   try {
     if (!orgs.length) await cargarOrgs();
     cabecera();
