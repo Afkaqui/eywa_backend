@@ -62,6 +62,8 @@ fundsRouter.get('/', async (c) => {
       deadline_text:    f.deadlineText,
       checklist:        f.checklist,
       url:              f.url,
+      postulantes:        f.postulantes,
+      postulantes_fuente: f.postulantesFuente,
       // Re-verificación nocturna (§16): cuándo se comprobó y de dónde salió la fecha.
       verify_status:    f.verifyStatus,
       verified_at:      f.verifiedAt ? f.verifiedAt.toISOString() : null,
@@ -85,6 +87,8 @@ const fundSchema = z.object({
   deadline_text:    z.string().optional().nullable(), // "Por convocatoria", "Abierto"…
   checklist:        z.string().optional().nullable(),
   url:              z.string().optional().nullable(),
+  postulantes:        z.number().int().min(0).max(1_000_000).optional().nullable(),
+  postulantes_fuente: z.string().max(300).optional().nullable(),
 });
 
 function toFundData(d: z.infer<typeof fundSchema>) {
@@ -100,6 +104,8 @@ function toFundData(d: z.infer<typeof fundSchema>) {
     deadlineText:    d.deadline ? null : (d.deadline_text?.trim() || null),
     checklist:       d.checklist?.trim() || null,
     url:             d.url?.trim() || null,
+    ...(d.postulantes !== undefined ? { postulantes: d.postulantes ?? null } : {}),
+    ...(d.postulantes_fuente !== undefined ? { postulantesFuente: d.postulantes_fuente?.trim() || null } : {}),
   };
 }
 

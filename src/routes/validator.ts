@@ -124,6 +124,67 @@ validatorRouter.put('/plans/:id/estructura', async (c) => {
   return c.json({ plan: serialize(actualizado) });
 });
 
+// ══ Revisión del consultor (el "30% humano", reunión 2026-10-08) ═══════════════
+// Gestor/admin/superadmin ven TODOS los proyectos y dejan observaciones internas.
+// La empresa dueña del proyecto NO ve estas notas (serialize() no las incluye).
+const STAFF = ['gestor', 'admin', 'superadmin'];
+async function exigirStaff(userId: string) {
+  const p = await db.profile.findUnique({ where: { id: userId }, select: { role: true, fullName: true, email: true } });
+  if (!p || !STAFF.includes(p.role)) throw new ApiError(403, 'Solo gestores y administradores');
+  return p;
+}
+
+// GET /api/validator/revision
+validatorRouter.get('/revision', async (c) => {
+  const user = getRequestUser(c);
+  await exigirStaff(user.sub);
+  const planes = await db.projectPlan.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 300,
+    include: {
+      user: { select: { fullName: true, email: true, company: true } },
+      _count: { select: { planDocuments: true } },
+    },
+  });
+  return c.json({
+    plans: planes.map((p) => ({
+      id: p.id, name: p.name, type: p.type, description: p.description,
+      status: p.status, etapa: p.etapa, budget: p.budget, duration: p.duration,
+      problema: p.problema ?? null, mpp: p.mpp ?? null,
+      documentos: p._count.planDocuments,
+      analizado: !!p.analyzedAt,
+      createdAt: p.createdAt.toISOString(),
+      autor: { nombre: p.user.fullName, email: p.user.email, empresa: p.user.company },
+      consultor: {
+        notas: p.consultorNotas, at: p.consultorNotasAt?.toISOString() ?? null, por: p.consultorNotasPor,
+      },
+    })),
+  });
+});
+
+// PUT /api/validator/revision/:id
+const notasSchema = z.object({ notas: z.string().max(8000).nullish() });
+validatorRouter.put('/revision/:id', async (c) => {
+  const user = getRequestUser(c);
+  const staff = await exigirStaff(user.sub);
+  const parsed = notasSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, 'Las observaciones superan los 8000 caracteres');
+  const notas = parsed.data.notas?.trim() || null;
+  try {
+    const p = await db.projectPlan.update({
+      where: { id: c.req.param('id') },
+      data: {
+        consultorNotas: notas,
+        consultorNotasAt: notas ? new Date() : null,
+        consultorNotasPor: notas ? (staff.fullName || staff.email) : null,
+      },
+    });
+    return c.json({ consultor: { notas: p.consultorNotas, at: p.consultorNotasAt?.toISOString() ?? null, por: p.consultorNotasPor } });
+  } catch {
+    throw new ApiError(404, 'Proyecto no encontrado');
+  }
+});
+
 // ── GET /api/validator/plans ─────────────────────────────────────────────────
 validatorRouter.get('/plans', async (c) => {
   const user = getRequestUser(c);

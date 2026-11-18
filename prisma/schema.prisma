@@ -459,6 +459,10 @@ model Fund {
   deadlineText    String?   @map("deadline_text") // "Por convocatoria", "Abierto", "Ventanilla…"
   checklist       String?   // evidencia Gate 0
   url             String?
+  // Competencia (océanos azules, reunión 2026-10-08): postulantes en la última
+  // edición y de dónde sale el dato (publicado por el fondo o informado).
+  postulantes       Int?
+  postulantesFuente String?  @map("postulantes_fuente")
 
   // ── Re-verificación automática (PENDIENTES §16) ──
   // Lo escribe el job nocturno (src/jobs/verificar-fondos.ts). Lo automático
@@ -666,6 +670,11 @@ model ProjectPlan {
   // unidad de validación) y Máximo Producto Posible. PLAN C1, C2.
   problema         Json?
   mpp              Json?
+  // Observaciones del consultor (el "30% humano", reunión 2026-10-08). Solo las
+  // ven y escriben gestor/admin/superadmin; la empresa NO las ve.
+  consultorNotas   String?   @map("consultor_notas")
+  consultorNotasAt DateTime? @map("consultor_notas_at")
+  consultorNotasPor String?  @map("consultor_notas_por") // nombre o email de quien escribió
   /// Cuándo aceptó enviar sus datos a ARS. NULL = no aceptó, no se puede enviar.
   maviConsentAt    DateTime? @map("mavi_consent_at")
   maviProjectId    String?   @unique @map("mavi_project_id")
