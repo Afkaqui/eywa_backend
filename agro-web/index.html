@@ -48,6 +48,28 @@
     .rt td.acc { justify-content: flex-end; flex-wrap: wrap; } .rt td.acc::before { content: none; }
     .rt-wrap { border: 0 !important; padding: 0 !important; background: transparent !important; }
   }
+  /* Identidad v2: movimiento (mismo sistema que la landing de EYWA) */
+  @keyframes ey-blur-in { from { opacity: 0; filter: blur(10px); transform: translateY(10px); } to { opacity: 1; filter: blur(0); transform: none; } }
+  @keyframes ey-fade-up { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+  @keyframes ey-pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+  @keyframes ey-float { 0%, 100% { transform: translateY(0) rotate(4deg); } 50% { transform: translateY(-10px) rotate(4deg); } }
+  @keyframes ey-zoom-out { from { transform: scale(1.12); } to { transform: scale(1); } }
+  .ey-blur-in { display: inline-block; animation: ey-blur-in .9s cubic-bezier(.2,.7,.2,1) both; }
+  .ey-float { animation: ey-float 6s ease-in-out infinite; }
+  .ey-hero-zoom { animation: ey-zoom-out 2.4s cubic-bezier(.2,.7,.2,1) both; }
+  .ey-lift { transition: transform .35s ease, box-shadow .35s ease; }
+  .ey-lift:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(17,24,39,.10); }
+  .ey-pill { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 999px; padding: .9rem 1.6rem; font-weight: 700; transition: transform .2s ease; }
+  .ey-pill:hover { transform: translateY(-2px); }
+  @supports (animation-timeline: view()) {
+    .ey-reveal { animation: ey-fade-up linear both; animation-timeline: view(); animation-range: entry 0% entry 70%; }
+    .ey-reveal-blur { animation: ey-blur-in linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+    .ey-reveal-pop { animation: ey-pop linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ey-blur-in, .ey-float, .ey-hero-zoom, .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: none !important; }
+    .ey-lift:hover, .ey-pill:hover { transform: none; }
+  }
   dialog::backdrop { background: rgba(17,24,39,.45); }
   dialog { border: 0; border-radius: 1rem; padding: 0; width: min(92vw, 440px); }
 </style>
@@ -99,7 +121,7 @@ async function api(ruta, opt = {}) {
   return opt.conEstado ? { status: r.status, d } : d;
 }
 function salir() { token = null; org = null; orgs = []; guardar('agro_token', null); guardar('agro_org', null); ir('/'); }
-function ir(ruta) { history.pushState({}, '', ruta); render(); }
+function ir(ruta) { history.pushState({}, '', ruta); window.scrollTo(0, 0); render(); }
 window.ir = ir;
 window.addEventListener('popstate', render);
 document.addEventListener('click', (e) => { const a = e.target.closest('a[data-ir]'); if (a) { e.preventDefault(); cerrarMenu(); ir(a.getAttribute('href')); } });
@@ -173,7 +195,7 @@ async function render() {
   const p = location.pathname, app = $('#app');
   const pub = p.match(/^\/p\/((LT|SC)-[0-9A-F]{8})$/i);
   if (pub) { cabecera(); return pasaporte(app, pub[1].toUpperCase()); }
-  if (!token) { cabecera(); return login(app); }
+  if (!token) { cabecera(); return p === '/entrar' ? login(app) : landing(app); }
   $('#cab').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
   // Indicador de carga: con la conexión de campo, una pantalla en blanco parece un error.
   app.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-400 py-10 justify-center"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Cargando…</div>';
@@ -194,6 +216,177 @@ async function render() {
   } catch (e) { app.innerHTML = aviso(e.message); }
 }
 
+// ── Landing pública (identidad v2): quien llega sin sesión ve qué es Agro ──
+const FOTO_BOSQUE = 'https://images.unsplash.com/photo-1705998989555-87ed424a269d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1600';
+const FOTO_CAMPO = 'https://images.unsplash.com/photo-1622353133218-825cfebb6844?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400';
+function palabras(t, desde, cls = '') {
+  return t.split(' ').map((p, i) => `<span class="ey-blur-in ${cls}" style="animation-delay:${(desde + i * 0.07).toFixed(2)}s">${p}&nbsp;</span>`).join('');
+}
+function landing(app) {
+  $('#cab').style.display = 'none';
+  app.className = '';
+  const ico = (d) => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  const problemas = [
+    ['Precio sin diferencial', 'bg-amber-100 text-amber-700', 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
+    ['Registros en papel', 'bg-violet-100 text-violet-700', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6'],
+    ['Parcelas sin georreferencia', 'bg-green-100 text-green-800', 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12zM12 6.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
+    ['Nuevas exigencias de Europa', 'bg-blue-100 text-blue-700', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18'],
+    ['El productor no sabe a dónde va su cosecha', 'bg-red-100 text-red-700', 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0'],
+  ];
+  const pasos = [
+    ['Registra a tus productores', 'Importa tu padrón desde Excel y georreferencia cada parcela.'],
+    ['Acopia y pesa cada entrega', 'Cosecha, fermentado y secado quedan registrados por lote.'],
+    ['Genera el pasaporte', 'Agrupa los sacos en un lote comercial y obtén su QR.'],
+    ['Vende con evidencia', 'El comprador verifica el origen y el pago justo antes de cerrar.'],
+  ];
+  app.innerHTML = `
+  <div class="bg-white text-gray-900">
+    <nav class="sticky top-0 z-40 bg-white/95 border-b border-gray-100 backdrop-blur">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+        <a href="/" data-ir class="flex items-center gap-2.5">
+          <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain">
+          <span class="leading-tight"><span class="block font-bold text-lg tracking-wide">EYWA <span class="text-green-700">AGRO</span></span>
+          <span class="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-emerald-700">Del lote al saco</span></span>
+        </a>
+        <div class="hidden lg:flex items-center gap-1 text-sm text-gray-600">
+          <a href="#solucion" class="px-3 py-2 hover:text-gray-900">Solución</a>
+          <a href="#como" class="px-3 py-2 hover:text-gray-900">Cómo funciona</a>
+          <a href="#pasaporte" class="px-3 py-2 hover:text-gray-900">Pasaporte</a>
+          <a href="#eudr" class="px-3 py-2 hover:text-gray-900">EUDR</a>
+          <a href="${EYWA}" class="px-3 py-2 hover:text-gray-900">← EYWA</a>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/entrar" data-ir class="hidden sm:block px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Iniciar sesión</a>
+          <a href="/entrar" data-ir class="ey-pill bg-green-800 text-white text-sm" style="padding:.65rem 1.2rem">Entrar</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="relative overflow-hidden bg-green-950">
+      <img src="${FOTO_BOSQUE}" alt="" class="ey-hero-zoom absolute inset-0 w-full h-full object-cover opacity-55">
+      <div class="absolute inset-0" style="background:linear-gradient(90deg,rgba(5,46,22,.88) 0%,rgba(5,46,22,.35) 75%)"></div>
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 flex flex-col gap-6">
+        <span class="ey-blur-in w-fit rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium text-green-200">Financiado por ProInnóvate · DER Cusco</span>
+        <h1 class="max-w-3xl text-4xl sm:text-5xl lg:text-6xl font-medium leading-[1.05] tracking-tight text-white">${palabras('Del lote al saco,', 0.05)}${palabras('trazable y justo', 0.33, 'text-green-300 font-bold')}</h1>
+        <p class="ey-blur-in max-w-xl text-lg leading-relaxed text-green-50" style="animation-delay:.65s">Registra productores, parcelas y cosechas desde el campo. Cada saco sale con un pasaporte con QR que muestra de dónde viene, cuándo se vendió y cuánto recibió el productor.</p>
+        <div class="ey-blur-in flex flex-col sm:flex-row gap-3" style="animation-delay:.8s">
+          <a href="/entrar" data-ir class="ey-pill bg-green-500 text-green-950">Empieza con tu cooperativa →</a>
+          <a href="#pasaporte" class="ey-pill border border-white/50 text-white font-medium">Ver cómo es el pasaporte</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="border-b border-gray-100">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-9 flex flex-col items-center gap-5 text-center">
+        <span class="text-gray-600">Con el respaldo de <b class="text-gray-900">instituciones que impulsan la innovación agraria</b></span>
+        <div class="flex flex-wrap justify-center gap-4">
+          ${['ProInnóvate', 'DER Cusco', 'GENES Perú', 'Incuval · UNHEVAL'].map((r) => `<span class="ey-reveal-pop ey-lift w-28 h-28 rounded-full bg-white shadow-md flex items-center justify-center text-center text-xs font-semibold text-gray-500 px-3">${r}</span>`).join('')}
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-14 flex flex-col items-center gap-10 text-center">
+      <div class="flex flex-col gap-3 items-center">
+        <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Problemas</span>
+        <h2 class="ey-reveal-blur text-3xl md:text-4xl text-green-800 tracking-tight">Conocemos los <b>problemas más comunes</b> de las cadenas de cacao y café</h2>
+      </div>
+      <div class="ey-reveal-pop w-full h-64 md:h-80 rounded-3xl overflow-hidden"><img src="${FOTO_CAMPO}" alt="Campo de cultivo" class="w-full h-full object-cover"></div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-6 w-full">
+        ${problemas.map(([t, c, d]) => `<div class="ey-reveal flex flex-col items-center gap-2.5"><span class="w-14 h-14 rounded-2xl flex items-center justify-center ${c}">${ico(d)}</span><span class="text-sm text-gray-700">${t}</span></div>`).join('')}
+      </div>
+    </section>
+
+    <section id="solucion" class="bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-24 flex flex-col gap-20">
+        <div class="flex flex-col lg:flex-row items-center gap-12">
+          <div class="ey-reveal flex-1 flex flex-col gap-5">
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Nuestra solución</span>
+            <h2 class="text-3xl md:text-4xl leading-tight">Una app de campo y una plataforma web para la <b class="text-green-800">trazabilidad de tu cooperativa</b></h2>
+            <div class="flex gap-3"><span class="w-11 h-11 shrink-0 rounded-full border border-gray-200 bg-white flex items-center justify-center text-green-800">${ico('M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2')}</span><div><div class="font-semibold text-green-800">App de campo</div><div class="text-sm text-gray-600">Registra parcelas y cosechas desde el celular, en la misma parcela.</div></div></div>
+            <div class="flex gap-3"><span class="w-11 h-11 shrink-0 rounded-full border border-gray-200 bg-white flex items-center justify-center text-green-800">${ico('M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 21h8M12 17v4')}</span><div><div class="font-semibold text-green-800">Plataforma web</div><div class="text-sm text-gray-600">Acopio, ventas y pagos en un solo lugar, con permisos por rol e importación desde Excel.</div></div></div>
+          </div>
+          <div class="ey-reveal-pop flex-1 w-full rounded-3xl overflow-hidden h-72 md:h-96"><img src="${FOTO_CAMPO}" alt="" class="w-full h-full object-cover"></div>
+        </div>
+
+        <div id="pasaporte" class="flex flex-col lg:flex-row-reverse items-center gap-12">
+          <div class="ey-reveal flex-1 flex flex-col gap-4">
+            <h3 class="text-3xl leading-snug"><b class="text-green-800">Aumentamos</b> el valor de tu producto mostrando un <b class="text-green-800">origen comprobado</b></h3>
+            <p class="text-gray-600 leading-relaxed">El comprador escanea el QR del saco y ve la historia completa del lote, incluido el pago al productor. Sin instalar nada, desde cualquier celular.</p>
+          </div>
+          <div class="ey-reveal-pop flex-1 flex flex-col items-center gap-3 py-6">
+            <div class="ey-float w-[260px] rounded-[40px] border-[10px] border-gray-900 bg-white shadow-2xl overflow-hidden">
+              <div class="bg-green-800 text-white px-4 py-4"><div class="text-[11px] opacity-80">Pasaporte de lote</div><div class="text-lg font-bold">LT-XXXXXXXX</div></div>
+              <div class="p-4 flex flex-col gap-2.5 text-[13px]">
+                <div class="flex justify-between"><span class="text-gray-500">Producto</span><b>Cacao en grano</b></div>
+                <div class="flex justify-between"><span class="text-gray-500">Origen</span><b>La Convención</b></div>
+                <div class="flex justify-between"><span class="text-gray-500">Pago al productor</span><b>S/ por kg</b></div>
+                <span class="mt-1 rounded-full bg-green-500 text-green-950 font-bold text-center py-2">Ver la historia →</span>
+              </div>
+            </div>
+            <span class="text-xs text-gray-400">Vista de ejemplo</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background-color:#166534;background-image:radial-gradient(rgba(255,255,255,.10) 1.5px,transparent 1.5px);background-size:26px 26px">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center gap-9 text-center">
+        <h2 class="ey-reveal-blur text-2xl md:text-3xl font-medium text-white">Meta del piloto en Megantoni, La Convención</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 w-full">
+          ${[['1', 'cadena agropecuaria'], ['3', 'organizaciones'], ['100', 'productores'], ['300', 'lotes trazados']].map(([n, t]) => `<div class="ey-reveal"><div class="text-5xl font-semibold text-white">${n}</div><div class="text-green-200">${t}</div></div>`).join('')}
+        </div>
+      </div>
+    </section>
+
+    <section id="como" class="max-w-5xl mx-auto px-4 sm:px-6 py-24 flex flex-col gap-14">
+      <div class="text-center flex flex-col gap-2">
+        <h2 class="ey-reveal-blur text-4xl text-green-800">¿Cómo funciona?</h2>
+        <p class="text-gray-600">Así trabaja tu cooperativa con EYWA Agro en <b>4 pasos</b></p>
+      </div>
+      ${pasos.map(([t, d], i) => `
+      <div class="ey-reveal flex gap-5 items-start ${i % 2 ? 'md:ml-auto md:max-w-xl' : 'md:max-w-xl'}">
+        <span class="w-12 h-12 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-lg font-semibold">${i + 1}</span>
+        <div><h3 class="text-2xl font-medium text-green-800 mb-1">${t}</h3><p class="text-gray-600">${d}</p></div>
+      </div>`).join('')}
+    </section>
+
+    <section id="eudr" class="relative overflow-hidden bg-green-950">
+      <img src="${FOTO_BOSQUE}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-35">
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-24 flex flex-col lg:flex-row gap-10 items-center">
+        <div class="flex-1 flex flex-col gap-4">
+          <span class="w-fit rounded-full bg-white/15 px-3 py-1 text-xs text-green-200">• Reglamento europeo de deforestación (EUDR)</span>
+          <h2 class="ey-reveal-blur text-3xl md:text-4xl font-semibold text-white">Tu cacao y café, listos para exportar a Europa</h2>
+          <p class="text-green-50 leading-relaxed">Guardamos la georreferencia de cada parcela y la historia de cada lote para que respondas con datos cuando te los pidan.</p>
+        </div>
+        <div class="ey-reveal-pop flex-1 w-full rounded-3xl border border-white/20 bg-white/10 p-6 flex flex-col gap-3 text-green-50">
+          <span class="font-semibold text-white">Lo que ya cubre</span>
+          <span>✓ Parcelas con coordenadas</span>
+          <span>✓ Trazabilidad lote por lote, con pasaporte y QR</span>
+          <span class="text-green-200">◌ Verificación satelital de deforestación: pendiente</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-green-50">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-24 flex flex-col items-center gap-5 text-center">
+        <h2 class="ey-reveal-blur text-3xl md:text-4xl text-green-800">Lleva tu cooperativa <b>del lote al saco</b></h2>
+        <p class="text-gray-600">Crea tu organización con tu cuenta de EYWA y empieza a registrar a tus productores hoy.</p>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <a href="/entrar" data-ir class="ey-pill bg-green-800 text-white">Empezar ahora</a>
+          <a href="${EYWA}" class="ey-pill border border-green-300 bg-white text-green-800 font-medium">Crear cuenta en EYWA</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="bg-gray-950 text-gray-400">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
+        <div class="flex flex-wrap items-center justify-center gap-3"><img src="/logo.png" alt="EYWA" class="w-8 h-8 rounded-lg bg-white object-contain"><span class="font-semibold text-white">EYWA Agro</span><span>· Del lote al saco, trazable y justo</span></div>
+        <span class="text-xs">Proyecto financiado por ProInnóvate · DER Cusco</span>
+      </div>
+    </footer>
+  </div>`;
+}
+
 // ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
 function login(app) {
   $('#cab').style.display = 'none';
@@ -202,7 +395,7 @@ function login(app) {
   <div class="min-h-screen flex">
     <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 bg-white">
       <div class="w-full max-w-md">
-        <a href="${EYWA}" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Ir a EYWA</a>
+        <a href="/" data-ir class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Volver a EYWA Agro</a>
         <div class="flex items-center gap-3 mb-10">
           <img src="/logo.png" alt="EYWA" class="w-12 h-12 object-contain">
           <div><div class="text-gray-900 font-bold text-2xl tracking-tight">EYWA <span class="text-emerald-600">AGRO</span></div>
@@ -217,7 +410,7 @@ function login(app) {
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Contraseña</span>
             <input class="inp" name="password" type="password" placeholder="••••••••" required autocomplete="current-password"></label>
           <div class="text-right"><a href="${EYWA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
-          <button class="w-full py-3.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold disabled:opacity-50" id="entrar">Iniciar Sesión</button>
+          <button class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 disabled:opacity-50" id="entrar">Iniciar sesión</button>
         </form>
         <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${EYWA}" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
       </div>
