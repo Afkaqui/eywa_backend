@@ -251,8 +251,13 @@ async function render() {
 }
 
 // ── Landing pública (identidad v2): quien llega sin sesión ve qué es Agro ──
-const FOTO_BOSQUE = 'https://images.unsplash.com/photo-1705998989555-87ed424a269d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1600';
-const FOTO_CAMPO = 'https://images.unsplash.com/photo-1622353133218-825cfebb6844?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400';
+// Fotos (Unsplash, licencia libre): una distinta por sección.
+const FOTO = {
+  hero: 'https://images.unsplash.com/photo-1564491683755-fb07a55a5299?auto=format&fit=crop&w=1600&q=75',     // productora con mazorcas de cacao
+  cafe: 'https://images.unsplash.com/photo-1772228616071-aa344913b93e?auto=format&fit=crop&w=1400&q=75', // cosecha de cerezas de café
+  productor: 'https://images.unsplash.com/photo-1564491814796-6aa433651cfd?auto=format&fit=crop&w=1400&q=75', // productor con su canasta de cacao
+  selva: 'https://images.unsplash.com/photo-1682887523090-8eed9a92a6e5?auto=format&fit=crop&w=1600&q=75',    // selva vista desde arriba
+};
 function palabras(t, desde, cls = '') {
   return t.split(' ').map((p, i) => `<span class="ey-blur-in ${cls}" style="animation-delay:${(desde + i * 0.07).toFixed(2)}s">${p}&nbsp;</span>`).join('');
 }
@@ -312,7 +317,7 @@ function landing(app) {
     </nav>
 
     <section class="relative overflow-hidden bg-green-950">
-      <img src="${FOTO_BOSQUE}" alt="" class="ey-hero-zoom absolute inset-0 w-full h-full object-cover opacity-55">
+      <img src="${FOTO.hero}" alt="Productora con mazorcas de cacao" class="ey-hero-zoom absolute inset-0 w-full h-full object-cover opacity-55">
       <div class="absolute inset-0" style="background:linear-gradient(90deg,rgba(5,46,22,.88) 0%,rgba(5,46,22,.35) 75%)"></div>
       <div class="hidden lg:block absolute right-[-60px] top-1/2 -translate-y-1/2" style="width:600px;height:600px">${orbitas(600, 4)}</div>
       <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 flex flex-col gap-6">
@@ -340,7 +345,7 @@ function landing(app) {
         <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Problemas</span>
         <h2 class="ey-reveal-blur text-3xl md:text-4xl text-green-800 tracking-tight">Conocemos los <b>problemas más comunes</b> de las cadenas de cacao y café</h2>
       </div>
-      <div class="ey-reveal-pop w-full h-64 md:h-80 rounded-3xl overflow-hidden"><img src="${FOTO_CAMPO}" alt="Campo de cultivo" class="w-full h-full object-cover"></div>
+      <div class="ey-reveal-pop w-full h-64 md:h-80 rounded-3xl overflow-hidden"><img src="${FOTO.cafe}" alt="Cosecha de cerezas de café" class="w-full h-full object-cover"></div>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-6 w-full">
         ${problemas.map(([t, c, d]) => `<div class="ey-reveal flex flex-col items-center gap-2.5"><span class="w-14 h-14 rounded-2xl flex items-center justify-center ${c}">${ico(d)}</span><span class="text-sm text-gray-700">${t}</span></div>`).join('')}
       </div>
@@ -355,7 +360,7 @@ function landing(app) {
             <div class="flex gap-3"><span class="w-11 h-11 shrink-0 rounded-full border border-gray-200 bg-white flex items-center justify-center text-green-800">${ico('M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2')}</span><div><div class="font-semibold text-green-800">App de campo</div><div class="text-sm text-gray-600">Registra parcelas y cosechas desde el celular, en la misma parcela.</div></div></div>
             <div class="flex gap-3"><span class="w-11 h-11 shrink-0 rounded-full border border-gray-200 bg-white flex items-center justify-center text-green-800">${ico('M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 21h8M12 17v4')}</span><div><div class="font-semibold text-green-800">Plataforma web</div><div class="text-sm text-gray-600">Acopio, ventas y pagos en un solo lugar, con permisos por rol e importación desde Excel.</div></div></div>
           </div>
-          <div class="ey-reveal-pop flex-1 w-full rounded-3xl overflow-hidden h-72 md:h-96"><img src="${FOTO_CAMPO}" alt="" class="w-full h-full object-cover"></div>
+          <div class="ey-reveal-pop flex-1 w-full rounded-3xl overflow-hidden h-72 md:h-96"><img src="${FOTO.productor}" alt="Productor con su cosecha de cacao" class="w-full h-full object-cover"></div>
         </div>
 
         <div id="pasaporte" class="flex flex-col lg:flex-row-reverse items-center gap-12">
@@ -404,7 +409,7 @@ function landing(app) {
     </section>
 
     <section id="eudr" class="relative overflow-hidden bg-green-950">
-      <img src="${FOTO_BOSQUE}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-35">
+      <img src="${FOTO.selva}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-40">
       <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-24 flex flex-col lg:flex-row gap-10 items-center">
         <div class="flex-1 flex flex-col gap-4">
           <span class="w-fit rounded-full bg-white/15 px-3 py-1 text-xs text-green-200">• Reglamento europeo de deforestación (EUDR)</span>
@@ -499,7 +504,7 @@ function login(app) {
       </div>
     </div>
     <div class="hidden lg:block lg:w-1/2 relative">
-      <div class="absolute inset-0 bg-cover bg-center" style="background-image:url('https://images.unsplash.com/photo-1622353133218-825cfebb6844?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080')">
+      <div class="absolute inset-0 bg-cover bg-center" style="background-image:url('https://images.unsplash.com/photo-1597816760638-406d7271105c?auto=format&fit=crop&w=1600&q=75')">
         <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/90 to-gray-900/80"></div></div>
       <div class="relative z-10 h-full flex flex-col justify-between p-12">
         <div><span class="inline-flex px-4 py-2 bg-white/10 border border-white/20 rounded-full text-emerald-300 text-sm font-medium">Vertical agro</span></div>
