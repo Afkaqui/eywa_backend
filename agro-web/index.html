@@ -66,9 +66,15 @@
     .ey-reveal-blur { animation: ey-blur-in linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
     .ey-reveal-pop { animation: ey-pop linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
   }
+  /* Movimiento reducido: fundido suave en vez de nada (sin desplazamientos ni zoom) */
+  @keyframes ey-fade { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) {
-    .ey-blur-in, .ey-float, .ey-hero-zoom, .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: none !important; }
+    .ey-blur-in { animation: ey-fade .6s ease both; }
+    .ey-float, .ey-hero-zoom { animation: none !important; }
     .ey-lift:hover, .ey-pill:hover { transform: none; }
+    @supports (animation-timeline: view()) {
+      .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: ey-fade linear both; animation-timeline: view(); animation-range: entry 0% entry 50%; }
+    }
   }
   dialog::backdrop { background: rgba(17,24,39,.45); }
   dialog { border: 0; border-radius: 1rem; padding: 0; width: min(92vw, 440px); }
