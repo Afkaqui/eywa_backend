@@ -76,6 +76,34 @@
       .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: ey-fade linear both; animation-timeline: view(); animation-range: entry 0% entry 50%; }
     }
   }
+  /* Componentes animados (mismos que la landing de EYWA, en verde Agro) */
+  @property --fx-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+  @keyframes fx-spin { to { --fx-angle: 360deg; } }
+  @keyframes fx-shine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+  @keyframes fx-ping { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); } 100% { box-shadow: 0 0 0 16px rgba(34,197,94,0); } }
+  .fx-badge { background: linear-gradient(rgba(5,46,22,.55), rgba(5,46,22,.55)) padding-box, conic-gradient(from var(--fx-angle), #86efac, #22c55e, #fde68a, #22c55e, #86efac) border-box; border: 1.5px solid transparent; animation: fx-spin 5s linear infinite; }
+  .fx-shine { background: linear-gradient(110deg, #bbf7d0 40%, #ffffff 50%, #bbf7d0 60%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fx-shine 3.2s linear infinite; }
+  .fx-tl { position: relative; }
+  .fx-tl-line { position: absolute; top: 0; bottom: 0; left: 23px; width: 3px; background: #e5e7eb; border-radius: 3px; }
+  @media (min-width: 768px) { .fx-tl-line { left: 50%; transform: translateX(-50%); } }
+  .fx-tl-line > i { display: block; width: 100%; height: calc(var(--p, 0) * 100%); background: linear-gradient(#86efac, #166534); border-radius: 3px; transition: height .15s linear; }
+  .fx-tl-item { opacity: .3; transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); transform: translateX(28px); }
+  @media (min-width: 768px) { .fx-tl-item.izq { transform: translateX(-36px); } .fx-tl-item.der { transform: translateX(36px); } }
+  .fx-tl-item.is-in { opacity: 1; transform: none; }
+  .fx-tl-num { transition: background-color .4s, color .4s, border-color .4s; }
+  .fx-tl-item.is-in .fx-tl-num { background: #22c55e; border-color: #22c55e; color: #fff; animation: fx-ping 1s ease-out 1; }
+  .fx-tl-item.is-in .fx-tl-card { border-color: #bbf7d0; box-shadow: 0 14px 34px rgba(22,101,52,.10); }
+  @keyframes fx-orbit { to { transform: rotate(360deg); } }
+  @keyframes fx-twinkle { 0%, 100% { opacity: .95; transform: scale(1); } 50% { opacity: .35; transform: scale(.6); } }
+  @keyframes fx-orbits-in { from { opacity: 0; transform: scale(.7) rotate(-40deg); } to { opacity: 1; transform: none; } }
+  .fx-orbits { animation: fx-orbits-in 1.6s cubic-bezier(.2,.7,.2,1) both; }
+  .fx-orbit { animation: fx-orbit 80s linear infinite; }
+  .fx-dot { animation: fx-twinkle 4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .fx-orbit { animation-duration: 240s !important; } .fx-dot { animation: none; }
+    .fx-badge { animation-duration: 12s; } .fx-shine { animation: none; color: #bbf7d0; background: none; }
+    .fx-tl-item, .fx-tl-item.izq, .fx-tl-item.der { transform: none; }
+  }
   dialog::backdrop { background: rgba(17,24,39,.45); }
   dialog { border: 0; border-radius: 1rem; padding: 0; width: min(92vw, 440px); }
 </style>
@@ -228,6 +256,21 @@ const FOTO_CAMPO = 'https://images.unsplash.com/photo-1622353133218-825cfebb6844
 function palabras(t, desde, cls = '') {
   return t.split(' ').map((p, i) => `<span class="ey-blur-in ${cls}" style="animation-delay:${(desde + i * 0.07).toFixed(2)}s">${p}&nbsp;</span>`).join('');
 }
+// Órbitas de puntos que giran en sentidos opuestos (hero "vivo"), en verdes y ámbar.
+function orbitas(size, rings) {
+  const col = ['#86efac', '#22c55e', '#bbf7d0', '#fbbf24', '#4ade80', '#dcfce7', '#16a34a'];
+  let h = `<div aria-hidden="true" class="fx-orbits pointer-events-none absolute" style="width:${size}px;height:${size}px">`;
+  for (let k = 0; k < rings; k++) {
+    const r = size / 2 - k * (size / (rings * 2.6)), n = Math.round((2 * Math.PI * r) / 26);
+    h += `<div class="fx-orbit absolute left-1/2 top-1/2" style="width:${r * 2}px;height:${r * 2}px;margin:-${r}px 0 0 -${r}px;animation-duration:${70 + k * 25}s;animation-direction:${k % 2 ? 'reverse' : 'normal'}">`;
+    for (let i = 0; i < n; i++) {
+      const t = (i / n) * 2 * Math.PI, s = 4 + ((i * 7 + k * 3) % 4);
+      h += `<span class="fx-dot absolute rounded-full" style="width:${s}px;height:${s}px;left:${(r + r * Math.cos(t) - s / 2).toFixed(1)}px;top:${(r + r * Math.sin(t) - s / 2).toFixed(1)}px;background:${col[(i * 3 + k) % col.length]};animation-delay:${((i * 37 + k * 11) % 40) / 10}s"></span>`;
+    }
+    h += '</div>';
+  }
+  return h + '</div>';
+}
 function landing(app) {
   $('#cab').style.display = 'none';
   app.className = '';
@@ -271,8 +314,9 @@ function landing(app) {
     <section class="relative overflow-hidden bg-green-950">
       <img src="${FOTO_BOSQUE}" alt="" class="ey-hero-zoom absolute inset-0 w-full h-full object-cover opacity-55">
       <div class="absolute inset-0" style="background:linear-gradient(90deg,rgba(5,46,22,.88) 0%,rgba(5,46,22,.35) 75%)"></div>
+      <div class="hidden lg:block absolute right-[-60px] top-1/2 -translate-y-1/2" style="width:600px;height:600px">${orbitas(600, 4)}</div>
       <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 flex flex-col gap-6">
-        <span class="ey-blur-in w-fit rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium text-green-200">Financiado por ProInnóvate · DER Cusco</span>
+        <span class="ey-blur-in"><span class="fx-badge inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium"><span aria-hidden="true">🏆</span><span class="fx-shine">Ganador · Emprendimientos Innovadores Región Cusco · ProInnóvate</span></span></span>
         <h1 class="max-w-3xl text-4xl sm:text-5xl lg:text-6xl font-medium leading-[1.05] tracking-tight text-white">${palabras('Del lote al saco,', 0.05)}${palabras('trazable y justo', 0.33, 'text-green-300 font-bold')}</h1>
         <p class="ey-blur-in max-w-xl text-lg leading-relaxed text-green-50" style="animation-delay:.65s">Registra productores, parcelas y cosechas desde el campo. Cada saco sale con un pasaporte con QR que muestra de dónde viene, cuándo se vendió y cuánto recibió el productor.</p>
         <div class="ey-blur-in flex flex-col sm:flex-row gap-3" style="animation-delay:.8s">
@@ -286,7 +330,7 @@ function landing(app) {
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-9 flex flex-col items-center gap-5 text-center">
         <span class="text-gray-600">Con el respaldo de <b class="text-gray-900">instituciones que impulsan la innovación agraria</b></span>
         <div class="flex flex-wrap justify-center gap-4">
-          ${['ProInnóvate', 'DER Cusco', 'GENES Perú', 'Incuval · UNHEVAL'].map((r) => `<span class="ey-reveal-pop ey-lift w-28 h-28 rounded-full bg-white shadow-md flex items-center justify-center text-center text-xs font-semibold text-gray-500 px-3">${r}</span>`).join('')}
+          ${[['ProInnóvate', 'proinnovate.png'], ['Innovandes Cusco · DER Cusco', 'innovandes-cusco.png'], ['Cámara de Comercio del Cusco', 'camara-cusco.png'], ['GENES Perú', 'genes-peru.png'], ['Incuval Ventures · UNHEVAL', 'incuval.svg']].map(([n, f]) => `<span class="ey-reveal-pop ey-lift w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-white shadow-md flex items-center justify-center p-5" title="${n}"><img src="/respaldos/${f}" alt="${n}" loading="lazy" class="max-w-full max-h-full object-contain"></span>`).join('')}
         </div>
       </div>
     </section>
@@ -339,7 +383,7 @@ function landing(app) {
       <div class="max-w-5xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center gap-9 text-center">
         <h2 class="ey-reveal-blur text-2xl md:text-3xl font-medium text-white">Meta del piloto en Megantoni, La Convención</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6 w-full">
-          ${[['1', 'cadena agropecuaria'], ['3', 'organizaciones'], ['100', 'productores'], ['300', 'lotes trazados']].map(([n, t]) => `<div class="ey-reveal"><div class="text-5xl font-semibold text-white">${n}</div><div class="text-green-200">${t}</div></div>`).join('')}
+          ${[['1', 'cadena agropecuaria'], ['3', 'organizaciones'], ['100', 'productores'], ['300', 'lotes trazados']].map(([n, t]) => `<div class="ey-reveal"><div class="text-5xl font-semibold text-white tabular-nums" data-count="${n}">${n}</div><div class="text-green-200">${t}</div></div>`).join('')}
         </div>
       </div>
     </section>
@@ -349,11 +393,14 @@ function landing(app) {
         <h2 class="ey-reveal-blur text-4xl text-green-800">¿Cómo funciona?</h2>
         <p class="text-gray-600">Así trabaja tu cooperativa con EYWA Agro en <b>4 pasos</b></p>
       </div>
-      ${pasos.map(([t, d], i) => `
-      <div class="ey-reveal flex gap-5 items-start ${i % 2 ? 'md:ml-auto md:max-w-xl' : 'md:max-w-xl'}">
-        <span class="w-12 h-12 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-lg font-semibold">${i + 1}</span>
-        <div><h3 class="text-2xl font-medium text-green-800 mb-1">${t}</h3><p class="text-gray-600">${d}</p></div>
-      </div>`).join('')}
+      <ol class="fx-tl flex flex-col gap-10" id="pasosTl">
+        <span class="fx-tl-line" aria-hidden="true"><i></i></span>
+        ${pasos.map(([t, d], i) => `
+        <li class="fx-tl-item ${i % 2 ? 'der md:pl-[calc(50%+2.5rem)]' : 'izq md:pr-[calc(50%+2.5rem)]'} relative pl-16 md:pl-0">
+          <span class="fx-tl-num absolute left-0 md:left-1/2 md:-translate-x-1/2 top-4 w-12 h-12 rounded-full border-2 border-gray-200 bg-white flex items-center justify-center text-lg font-bold text-gray-500 z-10">${i + 1}</span>
+          <div class="fx-tl-card ey-lift rounded-3xl border border-gray-200 bg-white p-6 ${i % 2 ? '' : 'md:text-right'}"><h3 class="text-2xl font-medium text-green-800 mb-1">${t}</h3><p class="text-gray-600">${d}</p></div>
+        </li>`).join('')}
+      </ol>
     </section>
 
     <section id="eudr" class="relative overflow-hidden bg-green-950">
@@ -391,6 +438,36 @@ function landing(app) {
       </div>
     </footer>
   </div>`;
+  animarLanding(app);
+}
+
+// Pasos que se encienden con el scroll y cifras que cuentan (sin dependencias).
+function animarLanding(app) {
+  const tl = $('#pasosTl', app), cifras = [...app.querySelectorAll('[data-count]')];
+  const reducir = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  cifras.forEach((el) => {
+    const fin = +el.dataset.count; if (reducir) return;
+    el.textContent = '0';
+    const obs = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return; obs.disconnect();
+      const t0 = performance.now();
+      const paso = (t) => { const k = Math.min(1, (t - t0) / 1400); el.textContent = Math.round(fin * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(paso); };
+      requestAnimationFrame(paso);
+    }, { threshold: 0.4 });
+    obs.observe(el);
+  });
+  if (!tl) return;
+  let raf = 0;
+  const medir = () => {
+    raf = 0;
+    if (!tl.isConnected) { removeEventListener('scroll', alScroll); return; }
+    const r = tl.getBoundingClientRect(), vh = innerHeight;
+    tl.style.setProperty('--p', Math.min(1, Math.max(0, (vh * 0.7 - r.top) / r.height)));
+    tl.querySelectorAll('.fx-tl-item').forEach((li) => li.classList.toggle('is-in', li.getBoundingClientRect().top < vh * 0.78));
+  };
+  const alScroll = () => { if (!raf) raf = requestAnimationFrame(medir); };
+  addEventListener('scroll', alScroll, { passive: true });
+  medir();
 }
 
 // ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
