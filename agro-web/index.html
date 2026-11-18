@@ -31,11 +31,21 @@
   .inp { width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .55rem .75rem; font-size: 16px; background: #fff; } /* 16px: evita el zoom automático de iOS */
   .inp:focus { outline: 2px solid #10b981; outline-offset: 0; }
   @media (min-width: 768px) { .inp { font-size: .875rem; } }
-  .btn { background: #059669; color: #fff; border-radius: .5rem; padding: .55rem 1rem; font-size: .875rem; font-weight: 600; min-height: 40px; }
-  .btn:hover { background: #047857; } .btn:disabled { opacity: .5; }
-  .btn2 { border: 1px solid #e5e7eb; border-radius: .5rem; padding: .45rem .75rem; font-size: .8rem; font-weight: 500; color: #374151; background: #fff; min-height: 36px; }
-  .btn2:hover { background: #f9fafb; }
-  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1.25rem; }
+  /* Identidad v2: botones en píldora verde Agro, tarjetas suaves */
+  .btn { background: #166534; color: #fff; border-radius: 9999px; padding: .6rem 1.2rem; font-size: .875rem; font-weight: 600; min-height: 40px; transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }
+  .btn:hover { background: #14532d; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(22,101,52,.22); } .btn:disabled { opacity: .5; transform: none; box-shadow: none; }
+  .btn2 { border: 1px solid #e5e7eb; border-radius: 9999px; padding: .45rem .9rem; font-size: .8rem; font-weight: 500; color: #374151; background: #fff; min-height: 36px; transition: background-color .2s, border-color .2s; }
+  .btn2:hover { background: #f0fdf4; border-color: #bbf7d0; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1.25rem; transition: box-shadow .3s ease, border-color .3s ease; }
+  .card:hover { box-shadow: 0 12px 30px rgba(17,24,39,.06); }
+  .inp { border-radius: .75rem !important; }
+  /* Cada pantalla interna entra suave y sus bloques aparecen en cascada */
+  @keyframes ag-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  #app.max-w-6xl > * { animation: ag-in .45s cubic-bezier(.2,.7,.2,1) both; }
+  #app.max-w-6xl .grid > * { animation: ag-in .5s cubic-bezier(.2,.7,.2,1) both; }
+  #app.max-w-6xl .grid > *:nth-child(2) { animation-delay: .05s; } #app.max-w-6xl .grid > *:nth-child(3) { animation-delay: .1s; }
+  #app.max-w-6xl .grid > *:nth-child(4) { animation-delay: .15s; } #app.max-w-6xl .grid > *:nth-child(n+5) { animation-delay: .2s; }
+  @media (prefers-reduced-motion: reduce) { #app.max-w-6xl > *, #app.max-w-6xl .grid > * { animation: ey-fade .3s ease both; } .btn:hover { transform: none; } }
   .rt { width: 100%; border-collapse: collapse; }
   .rt th { text-align: left; font-size: .7rem; text-transform: uppercase; color: #6b7280; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
   .rt td { padding: .55rem .5rem; border-bottom: 1px solid #f3f4f6; font-size: .85rem; vertical-align: top; }
