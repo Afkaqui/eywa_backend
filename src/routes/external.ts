@@ -7,6 +7,7 @@ import { validarRuc } from '@/lib/ruc';
 import { GENES_BANDS, GENES_SCALE, GENES_CATEGORIES, GENES_VERSION, GENES_AVISO, calcularGenes } from '@/lib/scoring';
 import { DataroomRepository } from '@/repositories/dataroom-repository';
 import { db } from '@/lib/db';
+import { FUND_TAGS, tagsForSector } from '@/lib/sector-tags';
 
 // ══ API externa v1 (PENDIENTES §15) ════════════════════════════════════════════
 //
@@ -349,6 +350,68 @@ externalRouter.get('/organizaciones/:referencia', requiereScope('organizaciones:
     organizacion: serOrganizacion(o),
     diagnostico:  ultimo ? serDiagnostico(ultimo, true) : null,
     historial:    [ultimo, ...anteriores].filter(Boolean).map((r) => serDiagnostico(r, false)),
+  });
+});
+
+// ══ GET /organizaciones/:referencia/fondos ═════════════════════════════════════
+// Fondos y convocatorias VIGENTES que encajan con el sector de una empresa que
+// este cliente dio de alta (§16: el catálogo se verifica cada noche y los fondos
+// nuevos solo entran tras aprobarlos un gestor). Mismo criterio que la
+// plataforma: comparten un tema con el sector, o son multisectoriales.
+externalRouter.get('/organizaciones/:referencia/fondos', requiereScope('organizaciones:leer'), async (c) => {
+  const cliente = getApiClient(c);
+  const o = await db.organization.findUnique({
+    where:  { apiClientId_externalRef: { apiClientId: cliente.id, externalRef: c.req.param('referencia') } },
+    select: { sector: true, country: true },
+  });
+  if (!o) throw new ApiError(404, 'No hay ninguna organización tuya con esa referencia_externa');
+
+  const temas = tagsForSector(o.sector);
+  if (!temas.length) {
+    return c.json({
+      sector: o.sector, temas: [], total: 0, fondos: [],
+      aviso: 'El sector de la organización no se reconoce o está vacío: actualízalo para poder sugerir fondos.',
+    });
+  }
+
+  const ahora = new Date();
+  const candidatos = await db.fund.findMany({
+    where: { candidate: false, OR: [{ deadline: { gte: ahora } }, { deadline: null }] },
+    orderBy: [{ deadline: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
+  });
+  const fondos = candidatos
+    .map((f) => {
+      const tags = (f.sectorTags as string[] | null) ?? [];
+      const comunes = tags.filter((t) => temas.includes(t));
+      const multi = tags.includes('multisectorial');
+      return { f, comunes, multi };
+    })
+    .filter((x) => x.comunes.length || x.multi)
+    // Primero los que coinciden por tema, luego los multisectoriales.
+    .sort((a, b) => Number(!a.comunes.length) - Number(!b.comunes.length))
+    .slice(0, 100);
+
+  return c.json({
+    sector: o.sector,
+    temas: temas.map((t) => ({ clave: t, nombre: FUND_TAGS[t] ?? t })),
+    total: fondos.length,
+    aviso: 'Encaje por temas del sector; revisa siempre las bases oficiales de cada convocatoria.',
+    fondos: fondos.map(({ f, comunes, multi }) => ({
+      nombre:          f.name,
+      ambito:          f.scope,
+      instrumento:     f.instrumentType,
+      montos:          f.amounts,
+      perfil_elegible: f.eligibleProfile,
+      cierre:          f.deadline ? f.deadline.toISOString().slice(0, 10) : null,
+      cierre_texto:    f.deadline ? null : f.deadlineText,
+      url:             f.url,
+      postulantes_ultima_edicion: f.postulantes,
+      encaje: {
+        temas_en_comun: comunes.map((t) => FUND_TAGS[t] ?? t),
+        multisectorial: multi,
+      },
+      verificado_el:   f.verifiedAt ? f.verifiedAt.toISOString().slice(0, 10) : null,
+    })),
   });
 });
 
