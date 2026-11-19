@@ -34,9 +34,9 @@ export const GLOSARIO: Termino[] = [
     definicion: 'Ubica a una empresa entre las revoluciones industriales (de 1.0 a 5.0) según su maquinaria, energía y operación. En América Latina suele estar entre 1.5 y 2.3. Sirve para sustentar el nivel tecnológico (TRL) de un proyecto. En EYWA aún está en desarrollo.' },
   // Innovación
   { termino: 'Nivel de madurez tecnológica', sigla: 'TRL', categoria: 'Innovación',
-    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación. En EYWA se usa la metodología del CONCYTEC: su calculadora en la plataforma Vincúlate (adaptada de NYSERDA, Horizonte 2020 y la NASA) da un resultado referencial.' },
+    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación. En EYWA se usa la escala del CONCYTEC (adaptada de la NASA y la Unión Europea; uso regulado por la R. P. 020-2022-CONCYTEC-P), que agrupa los niveles en investigación básica, investigación aplicada, desarrollo tecnológico e innovación. Su calculadora en Vincúlate da un resultado orientador y referencial.' },
   { termino: 'Nivel de madurez comercial', sigla: 'CRL', categoria: 'Innovación',
-    definicion: 'Escala paralela al TRL pero del lado del mercado: de las hipótesis del modelo de negocio a un modelo validado y listo para escalar. La calculadora del CONCYTEC (Vincúlate) lo mide como complemento del TRL para proyectos con un TRL elevado.' },
+    definicion: 'Escala paralela al TRL pero del lado del mercado: de las hipótesis del modelo de negocio a un modelo validado y listo para escalar. Escala de 1 a 9. En la propuesta del CONCYTEC es un complemento opcional del TRL: se evalúa cuando el proyecto ya tiene un TRL elevado, es un emprendimiento tecnológico y cuenta con información de mercado.' },
   { termino: 'Océano azul / océano rojo', categoria: 'Innovación',
     definicion: 'Océano rojo: un mercado o un fondo con mucha competencia. Océano azul: uno con pocos competidores. Ejemplo: dos fondos con el mismo monto, uno con 1000 postulantes y otro con 32; conviene el segundo.' },
   { termino: 'OKR', sigla: 'OKR', categoria: 'Innovación',
