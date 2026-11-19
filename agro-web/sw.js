@@ -10,7 +10,7 @@
 //  · Al cerrar sesión la página pide borrar la copia de datos ('limpiar').
 //
 // Subir VERSION cuando cambie la lista de archivos de la app.
-const VERSION = 'agro-v1';
+const VERSION = 'agro-v2';
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_API = 'agro-api';
 
@@ -24,9 +24,15 @@ const APP = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_APP).then((c) =>
-    Promise.all(APP.map((u) => c.add(new Request(u, u.startsWith('http') ? { mode: 'no-cors' } : {})).catch(() => {}))),
-  ));
+  // Las librerías de otros dominios llegan "opacas" (sin CORS): cache.add las
+  // rechaza, así que se piden y se guardan a mano.
+  e.waitUntil(caches.open(CACHE_APP).then((c) => Promise.all(APP.map(async (u) => {
+    try {
+      const externa = u.startsWith('http');
+      const r = await fetch(u, externa ? { mode: 'no-cors', redirect: 'follow' } : { cache: 'reload' });
+      if (r.ok || r.type === 'opaque') await c.put(u, r);
+    } catch { /* sin señal al instalar: se guardará en la próxima visita */ }
+  }))));
   self.skipWaiting();
 });
 
