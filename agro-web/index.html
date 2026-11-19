@@ -146,8 +146,14 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const num = (n, d = 0) => (n == null ? '—' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: d }));
 const hoy = () => new Date().toISOString().slice(0, 10);
 const EYWA = 'https://eywa.encsust4in4ble.earth';
-const leer = (k) => { try { return sessionStorage.getItem(k); } catch { return null; } };
-const guardar = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} };
+// La sesión se comparte entre pestañas (localStorage). Antes era por pestaña
+// (sessionStorage) y había que volver a entrar en cada pestaña nueva.
+const leer = (k) => { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch { return null; } };
+const guardar = (k, v) => { try { sessionStorage.removeItem(k); v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+// Entrada única: EYWA emite un código de un solo uso y vuelve aquí (/sso#c=…).
+const ENTRAR_CON_EYWA = EYWA + '/ir-a-agro';
+// Si se cierra sesión en otra pestaña, esta también sale.
+window.addEventListener('storage', (e) => { if (e.key === 'agro_token' && !e.newValue && token) { token = null; org = null; orgs = []; render(); } });
 let token = leer('agro_token');
 let orgs = [];          // organizaciones del usuario
 let org = null;         // activa
@@ -242,6 +248,7 @@ async function render() {
   const p = location.pathname, app = $('#app');
   const pub = p.match(/^\/p\/((LT|SC)-[0-9A-F]{8})$/i);
   if (pub) { cabecera(); return pasaporte(app, pub[1].toUpperCase()); }
+  if (p === '/sso') return entradaUnica(app);
   if (!token) { cabecera(); return p === '/entrar' ? login(app) : landing(app); }
   $('#cab').style.display = ''; app.className = 'max-w-6xl mx-auto px-4 py-6';
   // Indicador de carga: con la conexión de campo, una pantalla en blanco parece un error.
@@ -324,7 +331,7 @@ function landing(app) {
         </div>
         <div class="flex items-center gap-2">
           <a href="/entrar" data-ir class="hidden sm:block px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Iniciar sesión</a>
-          <a href="/entrar" data-ir class="ey-pill bg-green-800 text-white text-sm" style="padding:.65rem 1.2rem">Entrar</a>
+          <a href="${ENTRAR_CON_EYWA}" class="ey-pill bg-green-800 text-white text-sm" style="padding:.65rem 1.2rem">Entrar</a>
         </div>
       </div>
     </nav>
@@ -489,6 +496,26 @@ function animarLanding(app) {
 }
 
 // ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
+// ── Entrada única desde EYWA ──
+// Llega con #c=<código>&a=<ruta>. El código se canjea UNA vez por el token y se
+// borra de la barra de direcciones de inmediato.
+async function entradaUnica(app) {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const codigo = h.get('c');
+  const destino = /^\/(?!\/)[\w\-/]*$/.test(h.get('a') || '') ? h.get('a') : '/';
+  history.replaceState({}, '', '/sso');
+  $('#cab').style.display = 'none';
+  app.innerHTML = '<div class="min-h-[60vh] flex items-center justify-center gap-2 text-sm text-gray-500"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Entrando con tu cuenta de EYWA…</div>';
+  if (!codigo) { history.replaceState({}, '', '/entrar?sso=error'); return render(); }
+  try {
+    const d = await api('/auth/sso/canjear', { method: 'POST', body: { codigo } });
+    token = d.token; guardar('agro_token', token); orgs = []; org = null;
+    ir(destino);
+  } catch {
+    history.replaceState({}, '', '/entrar?sso=error'); render();
+  }
+}
+
 function login(app) {
   $('#cab').style.display = 'none';
   app.className = '';
@@ -502,16 +529,19 @@ function login(app) {
           <div><div class="text-gray-900 font-bold text-2xl tracking-tight">EYWA <span class="text-emerald-600">AGRO</span></div>
           <div class="text-emerald-600 text-xs tracking-wider">ORQUESTACIÓN DE ECOSISTEMAS</div></div>
         </div>
-        <h1 class="text-3xl sm:text-4xl font-light text-gray-900 mb-3">Bienvenido</h1>
-        <p class="text-gray-600 mb-8">Entra con tu cuenta de EYWA: es la misma.</p>
-        <div id="msg"></div>
+        <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 mb-3">Bienvenido</h1>
+        <p class="text-gray-600 mb-6">Tu cuenta de EYWA es la misma. Si ya entraste en EYWA, no necesitas tu contraseña.</p>
+        <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde EYWA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
+        <a href="${ENTRAR_CON_EYWA}" class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 flex items-center justify-center gap-2 mb-6">
+          <img src="/logo.png" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de EYWA</a>
+        <div class="flex items-center gap-3 text-xs text-gray-400 mb-6"><span class="flex-1 h-px bg-gray-200"></span>o con tu correo<span class="flex-1 h-px bg-gray-200"></span></div>
         <form id="f" class="space-y-5">
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</span>
             <input class="inp" name="email" type="email" placeholder="tu@empresa.com" required autocomplete="username"></label>
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Contraseña</span>
             <input class="inp" name="password" type="password" placeholder="••••••••" required autocomplete="current-password"></label>
           <div class="text-right"><a href="${EYWA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
-          <button class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 disabled:opacity-50" id="entrar">Iniciar sesión</button>
+          <button class="ey-pill w-full bg-white border border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50" id="entrar">Iniciar sesión</button>
         </form>
         <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${EYWA}" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
       </div>

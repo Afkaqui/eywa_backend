@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { randomBytes, createHash } from 'crypto';
 import { db } from '@/lib/db';
-import { signToken, ApiError } from '@/lib/auth-helpers';
+import { signToken, ApiError, getRequestUser } from '@/lib/auth-helpers';
+import { authMiddleware } from '@/middleware/auth';
 import { sendMail, baseTemplate, appUrl, isMailConfigured } from '@/lib/mailer';
 
 export const authRouter = new Hono();
@@ -356,4 +357,49 @@ authRouter.post('/reset-password', async (c) => {
   ]);
 
   return c.json({ message: 'Tu contraseña se actualizó. Ya puedes iniciar sesión.' });
+});
+
+
+// ══ Entrada única EYWA → EYWA Agro ═══════════════════════════════════════════
+// Quien ya inició sesión en EYWA entra a Agro sin volver a escribir su clave.
+// EYWA pide un CÓDIGO de un solo uso (60 s) y redirige a Agro con él en el
+// fragmento (#c=…, que no viaja al servidor ni queda en los logs); Agro lo canjea
+// por su token. El token nunca va en la URL.
+// En memoria: hay un solo contenedor y un código vive 60 s; si el contenedor se
+// reinicia en ese lapso, la persona solo tiene que volver a pulsar "Entrar".
+const SSO_TTL_MS = 60_000;
+const codigosSso = new Map<string, { userId: string; vence: number }>();
+function limpiarCodigos() {
+  const ahora = Date.now();
+  for (const [k, v] of codigosSso) if (v.vence < ahora) codigosSso.delete(k);
+}
+
+// POST /api/auth/sso/codigo  (con sesión de EYWA)
+authRouter.post('/sso/codigo', authMiddleware, async (c) => {
+  const u = getRequestUser(c);
+  limpiarCodigos();
+  const codigo = randomBytes(32).toString('base64url');
+  // Se guarda el HASH: un volcado de memoria no expone códigos canjeables.
+  codigosSso.set(createHash('sha256').update(codigo).digest('hex'), { userId: u.sub, vence: Date.now() + SSO_TTL_MS });
+  return c.json({ codigo, vence_en_s: SSO_TTL_MS / 1000 });
+});
+
+// POST /api/auth/sso/canjear  { codigo } → { token, user }
+authRouter.post('/sso/canjear', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const codigo = typeof body?.codigo === 'string' ? body.codigo : '';
+  if (!codigo || codigo.length > 100) throw new ApiError(400, 'Código inválido');
+  const clave = createHash('sha256').update(codigo).digest('hex');
+  const reg = codigosSso.get(clave);
+  codigosSso.delete(clave); // un solo uso, aunque falle
+  if (!reg || reg.vence < Date.now()) throw new ApiError(401, 'El enlace de acceso venció. Vuelve a intentarlo.');
+
+  const user = await db.profile.findUnique({ where: { id: reg.userId } });
+  if (!user) throw new ApiError(401, 'Cuenta no encontrada');
+  await db.profile.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+  const token = signToken({ sub: user.id, email: user.email, role: user.role, plan: user.plan, name: user.fullName ?? undefined });
+  return c.json({
+    token,
+    user: { id: user.id, email: user.email, name: user.fullName, role: user.role, plan: user.plan, company: user.company },
+  });
 });
