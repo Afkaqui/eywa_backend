@@ -8,6 +8,8 @@ import { serializeCourse, serializeEnrollment, serializeSection } from '@/lib/se
 import { db } from '@/lib/db';
 import { servirArchivo } from '@/lib/file-response';
 import path from 'path';
+import { mkdir, writeFile, unlink } from 'fs/promises';
+import { randomUUID } from 'crypto';
 
 export const coursesRouter = new Hono();
 const courseRepo  = new CourseRepository(db);
@@ -124,8 +126,19 @@ coursesRouter.get('/:id/sections', async (c) => {
   const done  = sections.filter(s => completedSet.has(s.id)).length;
   const allDone = total > 0 && done === total;
 
+  // Tareas de cada sección + la entrega de ESTE usuario (si la hay).
+  const tareas = await db.courseTask.findMany({
+    where: { section: { courseId } }, orderBy: { sortOrder: 'asc' },
+    include: { entregas: { where: { userId: user.sub } } },
+  });
+  const porSeccion = new Map<string, ReturnType<typeof serTarea>[]>();
+  for (const t of tareas) {
+    if (!porSeccion.has(t.sectionId)) porSeccion.set(t.sectionId, []);
+    porSeccion.get(t.sectionId)!.push(serTarea(t, t.entregas[0] ?? null));
+  }
+
   return c.json({
-    sections: sections.map(s => serializeSection(s, completedSet)),
+    sections: sections.map(s => ({ ...serializeSection(s, completedSet), tareas: porSeccion.get(s.id) ?? [] })),
     progress: {
       completed_sections: done,
       total_sections:     total,
@@ -148,6 +161,142 @@ coursesRouter.get('/:id/sections', async (c) => {
       } : null,
     },
   });
+});
+
+// ══ Tareas y entregas ═══════════════════════════════════════════════════════
+const STAFF = ['gestor', 'admin', 'superadmin'];
+const UPLOAD_BASE = process.env.UPLOAD_DIR || '/app/uploads';
+const MAX_ENTREGA = 10 * 1024 * 1024; // 10 MB
+const MIME_ENTREGA = [
+  'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+];
+
+type TareaRow = { id: string; titulo: string; instrucciones: string; imagenUrl: string | null; permiteTexto: boolean; permiteArchivo: boolean };
+type EntregaRow = { id: string; texto: string | null; archivoNombre: string | null; archivoSize: number | null; estado: string; comentario: string | null; revisadaAt: Date | null; updatedAt: Date };
+
+function serEntrega(e: EntregaRow) {
+  return {
+    id: e.id, texto: e.texto, estado: e.estado, comentario: e.comentario,
+    archivo: e.archivoNombre ? { nombre: e.archivoNombre, tamano: e.archivoSize, url: `/api/proxy/courses/entregas/${e.id}/archivo` } : null,
+    revisada_at: e.revisadaAt?.toISOString() ?? null, enviada_at: e.updatedAt.toISOString(),
+  };
+}
+function serTarea(t: TareaRow, e: EntregaRow | null) {
+  return {
+    id: t.id, titulo: t.titulo, instrucciones: t.instrucciones, imagen_url: t.imagenUrl,
+    permite_texto: t.permiteTexto, permite_archivo: t.permiteArchivo,
+    mi_entrega: e ? serEntrega(e) : null,
+  };
+}
+const nombreSeguro = (n: string) => path.basename(n).replace(/[^\w.\-() ]+/g, '_').slice(0, 120) || 'archivo';
+
+// ── POST /api/courses/tasks/:taskId/entrega  (multipart: texto?, file?) ─────
+// Una entrega por persona y tarea; volver a enviar la reemplaza y la deja
+// "enviada" otra vez (para que se revise de nuevo).
+coursesRouter.post('/tasks/:taskId/entrega', async (c) => {
+  const user = getRequestUser(c);
+  const tarea = await db.courseTask.findUnique({ where: { id: c.req.param('taskId') }, include: { section: true } });
+  if (!tarea) throw new ApiError(404, 'Tarea no encontrada');
+  const inscrito = await db.courseEnrollment.findFirst({ where: { userId: user.sub, courseId: tarea.section.courseId } });
+  if (!inscrito && !STAFF.includes(user.role)) throw new ApiError(403, 'Inscríbete en el curso para entregar la tarea');
+
+  const body = await c.req.parseBody();
+  const texto = typeof body['texto'] === 'string' ? body['texto'].trim().slice(0, 10000) : '';
+  const file = body['file'] as { name: string; size: number; type: string; arrayBuffer: () => Promise<ArrayBuffer> } | undefined;
+  const hayArchivo = !!file && typeof file !== 'string' && typeof file.arrayBuffer === 'function' && file.size > 0;
+  const previa = await db.taskSubmission.findUnique({ where: { taskId_userId: { taskId: tarea.id, userId: user.sub } } });
+  if (!texto && !hayArchivo && !previa?.archivoPath) throw new ApiError(400, 'Escribe tu respuesta o adjunta un archivo');
+  if (texto && !tarea.permiteTexto) throw new ApiError(400, 'Esta tarea solo acepta archivos');
+  if (hayArchivo && !tarea.permiteArchivo) throw new ApiError(400, 'Esta tarea solo acepta texto');
+
+  let archivo: { archivoPath: string; archivoNombre: string; archivoMime: string; archivoSize: number } | null = null;
+  if (hayArchivo) {
+    if (file!.size > MAX_ENTREGA) throw new ApiError(400, 'El archivo supera los 10 MB');
+    if (!MIME_ENTREGA.includes(file!.type)) throw new ApiError(400, 'Formato no permitido. Usa PDF, Word, Excel, PowerPoint, imagen o texto.');
+    const dir = path.join(UPLOAD_BASE, 'academia-entregas', tarea.id);
+    await mkdir(dir, { recursive: true });
+    const destino = path.join(dir, `${user.sub}-${randomUUID().slice(0, 8)}-${nombreSeguro(file!.name)}`);
+    await writeFile(destino, Buffer.from(await file!.arrayBuffer()));
+    archivo = { archivoPath: destino, archivoNombre: nombreSeguro(file!.name), archivoMime: file!.type, archivoSize: file!.size };
+    if (previa?.archivoPath) await unlink(previa.archivoPath).catch(() => {});
+  }
+
+  const datos = {
+    texto: texto || null,
+    ...(archivo ?? {}),
+    estado: 'enviada', revisadaPor: null, revisadaAt: null,
+  };
+  const e = await db.taskSubmission.upsert({
+    where:  { taskId_userId: { taskId: tarea.id, userId: user.sub } },
+    create: { taskId: tarea.id, userId: user.sub, ...datos },
+    update: datos,
+  });
+  return c.json({ entrega: serEntrega(e) }, previa ? 200 : 201);
+});
+
+// ── GET /api/courses/entregas/:id/archivo  (dueño de la entrega o staff) ────
+coursesRouter.get('/entregas/:id/archivo', async (c) => {
+  const user = getRequestUser(c);
+  const e = await db.taskSubmission.findUnique({ where: { id: c.req.param('id') } });
+  if (!e || !e.archivoPath) throw new ApiError(404, 'Archivo no encontrado');
+  if (e.userId !== user.sub && !STAFF.includes(user.role)) throw new ApiError(403, 'No puedes ver esta entrega');
+  const res = await servirArchivo({
+    ruta: e.archivoPath, nombre: e.archivoNombre ?? 'entrega', rango: c.req.header('range') ?? null,
+    mime: e.archivoMime ?? 'application/octet-stream',
+    descargar: !['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain'].includes(e.archivoMime ?? ''),
+  });
+  if (!res) throw new ApiError(404, 'Archivo no encontrado');
+  return res;
+});
+
+// ── GET /api/courses/:id/entregas  (staff: todas las entregas del curso) ────
+coursesRouter.get('/:id/entregas', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+  const l = await db.taskSubmission.findMany({
+    where: { tarea: { section: { courseId: c.req.param('id') } } },
+    orderBy: [{ estado: 'asc' }, { updatedAt: 'desc' }],
+    include: {
+      user: { select: { fullName: true, email: true, company: true } },
+      tarea: { select: { titulo: true, section: { select: { title: true } } } },
+    },
+  });
+  return c.json({ entregas: l.map((e) => ({
+    ...serEntrega(e),
+    alumno: { nombre: e.user.fullName, email: e.user.email, empresa: e.user.company },
+    tarea: e.tarea.titulo, seccion: e.tarea.section.title, revisada_por: e.revisadaPor,
+  })) });
+});
+
+// ── POST /api/courses/entregas/:id/revision  { estado, comentario } (staff) ──
+const revisionSchema = z.object({
+  estado: z.enum(['revisada', 'por_corregir']),
+  comentario: z.string().trim().max(4000).nullish(),
+});
+coursesRouter.post('/entregas/:id/revision', async (c) => {
+  const user = getRequestUser(c);
+  assertRole(user, ['gestor', 'admin', 'superadmin']);
+  const parsed = revisionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, 'Revisión inválida');
+  if (parsed.data.estado === 'por_corregir' && !parsed.data.comentario) {
+    throw new ApiError(400, 'Escribe qué debe corregir');
+  }
+  const revisor = await db.profile.findUnique({ where: { id: user.sub }, select: { fullName: true, email: true } });
+  try {
+    const e = await db.taskSubmission.update({
+      where: { id: c.req.param('id') },
+      data: {
+        estado: parsed.data.estado, comentario: parsed.data.comentario || null,
+        revisadaPor: revisor?.fullName || revisor?.email || user.sub, revisadaAt: new Date(),
+      },
+    });
+    return c.json({ entrega: serEntrega(e) });
+  } catch {
+    throw new ApiError(404, 'Entrega no encontrada');
+  }
 });
 
 // Valida en servidor que el usuario pueda rendir el examen

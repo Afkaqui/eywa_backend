@@ -88,6 +88,7 @@ model Profile {
   esgHistory          EsgHistory[]
   projectPlans        ProjectPlan[]
   solicitudesBaja     SolicitudBaja[]
+  entregasTareas      TaskSubmission[]
   sectionProgress     SectionProgress[]
   examAttempts        ExamAttempt[]
   certificates        Certificate[]
@@ -295,6 +296,7 @@ model CourseSection {
   course    Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
   resources SectionResource[]
   progress  SectionProgress[]
+  tareas    CourseTask[]
 
   @@index([courseId])
   @@map("course_sections")
@@ -970,4 +972,48 @@ model SolicitudBaja {
 
   @@index([estado, createdAt])
   @@map("solicitudes_baja")
+}
+
+// Tareas de una sección de curso (Academia). El alumno entrega texto y/o un
+// archivo; un gestor/admin la revisa y deja un comentario.
+model CourseTask {
+  id             String   @id @default(uuid()) @db.Uuid
+  sectionId      String   @map("section_id") @db.Uuid
+  titulo         String
+  instrucciones  String
+  imagenUrl      String?  @map("imagen_url")
+  permiteTexto   Boolean  @default(true) @map("permite_texto")
+  permiteArchivo Boolean  @default(true) @map("permite_archivo")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  section  CourseSection    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  entregas TaskSubmission[]
+
+  @@index([sectionId])
+  @@map("course_tasks")
+}
+
+model TaskSubmission {
+  id            String    @id @default(uuid()) @db.Uuid
+  taskId        String    @map("task_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  texto         String?
+  archivoPath   String?   @map("archivo_path")
+  archivoNombre String?   @map("archivo_nombre")
+  archivoMime   String?   @map("archivo_mime")
+  archivoSize   Int?      @map("archivo_size")
+  estado        String    @default("enviada") // enviada | revisada | por_corregir
+  comentario    String?
+  revisadaPor   String?   @map("revisada_por")
+  revisadaAt    DateTime? @map("revisada_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tarea CourseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user  Profile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([estado])
+  @@map("task_submissions")
 }
