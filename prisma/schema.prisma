@@ -681,6 +681,12 @@ model ProjectPlan {
   mpp              Json?
   // Observaciones del consultor (el "30% humano", reunión 2026-10-08). Solo las
   // ven y escriben gestor/admin/superadmin; la empresa NO las ve.
+  // Madurez según la metodología del CONCYTEC (calculadora TRL/CRL de Vincúlate).
+  // EYWA no calcula: registra el resultado que dio la calculadora oficial.
+  trl              Int?
+  crl              Int?
+  madurezAt        DateTime? @map("madurez_at")
+  madurezNota      String?   @map("madurez_nota") // código o enlace del resultado, observaciones
   consultorNotas   String?   @map("consultor_notas")
   consultorNotasAt DateTime? @map("consultor_notas_at")
   consultorNotasPor String?  @map("consultor_notas_por") // nombre o email de quien escribió

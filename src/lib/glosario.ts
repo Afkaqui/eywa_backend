@@ -34,9 +34,9 @@ export const GLOSARIO: Termino[] = [
     definicion: 'Ubica a una empresa entre las revoluciones industriales (de 1.0 a 5.0) según su maquinaria, energía y operación. En América Latina suele estar entre 1.5 y 2.3. Sirve para sustentar el nivel tecnológico (TRL) de un proyecto. En EYWA aún está en desarrollo.' },
   // Innovación
   { termino: 'Nivel de madurez tecnológica', sigla: 'TRL', categoria: 'Innovación',
-    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación.' },
+    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación. En EYWA se usa la metodología del CONCYTEC: su calculadora en la plataforma Vincúlate (adaptada de NYSERDA, Horizonte 2020 y la NASA) da un resultado referencial.' },
   { termino: 'Nivel de madurez comercial', sigla: 'CRL', categoria: 'Innovación',
-    definicion: 'Escala equivalente al TRL pero del lado del mercado: de la hipótesis de cliente a las ventas recurrentes.' },
+    definicion: 'Escala paralela al TRL pero del lado del mercado: de las hipótesis del modelo de negocio a un modelo validado y listo para escalar. La calculadora del CONCYTEC (Vincúlate) lo mide como complemento del TRL para proyectos con un TRL elevado.' },
   { termino: 'Océano azul / océano rojo', categoria: 'Innovación',
     definicion: 'Océano rojo: un mercado o un fondo con mucha competencia. Océano azul: uno con pocos competidores. Ejemplo: dos fondos con el mismo monto, uno con 1000 postulantes y otro con 32; conviene el segundo.' },
   { termino: 'OKR', sigla: 'OKR', categoria: 'Innovación',

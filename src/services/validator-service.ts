@@ -174,6 +174,9 @@ function buildPrompt(plan: ProjectPlan, docText = ''): string {
     plan.stakeholders ? `Stakeholders: ${plan.stakeholders}` : '',
     problemaTexto(plan.problema),
     mppTexto(plan.mpp),
+    plan.trl != null || plan.crl != null
+      ? `Madurez según la calculadora del CONCYTEC (referencial): ${[plan.trl != null ? `TRL ${plan.trl}` : '', plan.crl != null ? `CRL ${plan.crl}` : ''].filter(Boolean).join(', ')}`
+      : '',
     // Fase 3: contenido extraído de los documentos adjuntos (solo si READ_DOCS).
     docText ? `\nContenido de los documentos adjuntos del proyecto:\n${docText}` : '',
   ].filter(Boolean).join('\n');

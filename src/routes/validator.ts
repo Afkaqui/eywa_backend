@@ -72,6 +72,9 @@ function serialize(plan: Awaited<ReturnType<ValidatorRepository['getByIdForUser'
     etapa:        plan.etapa,
     problema:     plan.problema ?? null,
     mpp:          plan.mpp ?? null,
+    madurez:      plan.trl != null || plan.crl != null ? {
+      trl: plan.trl, crl: plan.crl, fecha: plan.madurezAt?.toISOString() ?? null, nota: plan.madurezNota,
+    } : null,
     mavi: {
       // Si nunca se envió, todo esto va en null y la UI muestra el botón.
       consentido:  !!plan.maviConsentAt,
@@ -151,6 +154,7 @@ validatorRouter.get('/revision', async (c) => {
       id: p.id, name: p.name, type: p.type, description: p.description,
       status: p.status, etapa: p.etapa, budget: p.budget, duration: p.duration,
       problema: p.problema ?? null, mpp: p.mpp ?? null,
+      madurez: p.trl != null || p.crl != null ? { trl: p.trl, crl: p.crl, fecha: p.madurezAt?.toISOString() ?? null } : null,
       documentos: p._count.planDocuments,
       analizado: !!p.analyzedAt,
       createdAt: p.createdAt.toISOString(),
@@ -183,6 +187,35 @@ validatorRouter.put('/revision/:id', async (c) => {
   } catch {
     throw new ApiError(404, 'Proyecto no encontrado');
   }
+});
+
+// ── PUT /api/validator/plans/:id/madurez ─────────────────────────────────────
+// TRL y CRL obtenidos en la calculadora del CONCYTEC (metodología oficial). EYWA
+// solo los registra; el resultado es referencial, como lo indica el CONCYTEC.
+const nivel = z.number().int().min(1).max(9).nullable();
+const madurezSchema = z.object({
+  trl: nivel, crl: nivel,
+  fecha: z.string().refine((v) => !isNaN(Date.parse(v)), 'Fecha inválida').nullish(),
+  nota: z.string().trim().max(500).nullish(),
+});
+validatorRouter.put('/plans/:id/madurez', async (c) => {
+  const user = getRequestUser(c);
+  const plan = await validatorRepo.getByIdForUser(c.req.param('id'), user.sub);
+  if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
+  const parsed = madurezSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) throw new ApiError(400, parsed.error.errors[0]?.message ?? 'Datos inválidos');
+  const d = parsed.data;
+  const vacio = d.trl == null && d.crl == null;
+  await db.projectPlan.update({
+    where: { id: plan.id },
+    data: {
+      trl: d.trl, crl: d.crl,
+      madurezAt: vacio ? null : (d.fecha ? new Date(d.fecha) : new Date()),
+      madurezNota: vacio ? null : (d.nota || null),
+    },
+  });
+  const actualizado = await validatorRepo.getByIdForUser(plan.id, user.sub);
+  return c.json({ plan: serialize(actualizado) });
 });
 
 // ── GET /api/validator/plans ─────────────────────────────────────────────────
