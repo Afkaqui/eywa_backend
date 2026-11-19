@@ -376,14 +376,10 @@ validatorRouter.delete('/plans/:id/documents/:docId', async (c) => {
 // ── DELETE /api/validator/plans/:id ──────────────────────────────────────────
 // ── MAVI / ARS LAB (§14) ─────────────────────────────────────────────────────
 //
-// El envío manda a un TERCERO el nombre, correo, teléfono, organización y RUC de
-// quien presenta el proyecto. La API exige `consentimiento_datos: true` y rechaza
-// `false`, así que el consentimiento no es un detalle del formulario: es la
-// condición para que exista el envío.
-//
-// Por eso son dos pasos y no uno. Aceptar queda registrado con su fecha, y el
-// envío comprueba ese registro en vez de fiarse de un campo que venga en el body:
-// si viniera del cliente, cualquiera podría afirmarlo por el usuario.
+// MAVI es el modelo de evaluación de EYWA y no conserva los datos. La API exige
+// `consentimiento_datos: true`: ese consentimiento es la aceptación de los
+// términos al crear la cuenta (una sola vez). La ruta /consentimiento queda por
+// compatibilidad, pero la plataforma ya no la usa.
 
 // POST /api/validator/plans/:id/mavi/consentimiento
 validatorRouter.post('/plans/:id/mavi/consentimiento', async (c) => {
@@ -418,9 +414,10 @@ validatorRouter.post('/plans/:id/mavi', async (c) => {
   });
   if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
 
-  if (!plan.maviConsentAt) {
-    throw new ApiError(400, 'Falta tu autorización para enviar estos datos a ARS LAB');
-  }
+  // MAVI es el modelo de evaluación de EYWA: el consentimiento es el que la persona
+  // dio UNA vez al aceptar los términos al crear su cuenta (decisión 2026-11-19).
+  // Ya no hay una casilla por proyecto; se registra la fecha del envío como
+  // constancia y se informa a MAVI que el consentimiento existe.
   if (plan.maviProjectId) {
     throw new ApiError(409, 'Este proyecto ya se envió a MAVI');
   }
@@ -475,6 +472,7 @@ validatorRouter.post('/plans/:id/mavi', async (c) => {
       maviDecision:    lite.decision_sugerida ?? null,
       maviPendientes:  (lite.documentos_pendientes ?? []) as unknown as Prisma.InputJsonValue,
       maviSentAt:      new Date(),
+      maviConsentAt:   plan.maviConsentAt ?? new Date(), // constancia: cubierto por los términos de la cuenta
     },
     include: { planDocuments: true },
   });

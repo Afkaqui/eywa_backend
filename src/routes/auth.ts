@@ -21,6 +21,7 @@ const registerSchema = z.object({
   password:  z.string().min(6),
   full_name: z.string().min(1),
   company:   z.string().optional(),
+  acepta_terminos: z.boolean().optional(),
 });
 
 // ── POST /api/auth/validate  (llamado por Auth.js v5 Credentials provider) ────
@@ -85,6 +86,8 @@ authRouter.post('/register', async (c) => {
       company:  company ?? null,
       role:     'user',
       plan:     'free',
+      // El formulario no deja registrarse sin marcar la casilla de términos.
+      terminosAceptadosAt: parsed.data.acepta_terminos ? new Date() : null,
     },
   });
 

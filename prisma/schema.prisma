@@ -69,6 +69,9 @@ model Profile {
   // Nulos hasta que el usuario inicie sesión o cambie su clave: NO se rellenan
   // con datos inventados para los usuarios que ya existían.
   lastLoginAt       DateTime? @map("last_login_at")
+  // Aceptación de los términos y la política de privacidad al crear la cuenta.
+  // Es el ÚNICO consentimiento: cubre, entre otros, la evaluación con MAVI.
+  terminosAceptadosAt DateTime? @map("terminos_aceptados_at")
   passwordChangedAt DateTime? @map("password_changed_at")
   // Administrador que la fijó. NULL = la cambió el propio usuario.
   passwordChangedBy String?   @map("password_changed_by") @db.Uuid
