@@ -867,6 +867,10 @@ model AgroProductor {
   dni       String?
   comunidad String?
   telefono  String?
+  // El productor decide si su nombre completo sale en el pasaporte público.
+  // Por defecto NO: solo iniciales. La cooperativa lo marca con su autorización.
+  mostrarNombre   Boolean   @default(false) @map("mostrar_nombre")
+  mostrarNombreAt DateTime? @map("mostrar_nombre_at") // cuándo se registró la autorización
   createdAt DateTime @default(now()) @map("created_at")
 
   owner        Profile?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)

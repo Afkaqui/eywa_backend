@@ -819,12 +819,19 @@ async function productores(app, msg = '') {
       <input class="inp" name="dni" placeholder="DNI (privado)" inputmode="numeric" maxlength="8">
       <input class="inp" name="comunidad" placeholder="Comunidad / sector">
       <input class="inp" name="telefono" placeholder="Teléfono (privado)" inputmode="tel">
+      <label class="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 rounded-xl p-2.5">
+        <input type="checkbox" name="mostrar_nombre" class="mt-0.5 accent-green-700">
+        <span>El productor <b>autoriza</b> mostrar su nombre completo en el pasaporte público</span></label>
       <button class="btn w-full">Guardar</button>
-      <p class="text-[11px] text-gray-400">El DNI, el teléfono y el nombre completo nunca aparecen en el pasaporte público.</p>
+      <p class="text-[11px] text-gray-400">El DNI y el teléfono nunca aparecen en el pasaporte público. Sin autorización, el pasaporte muestra solo sus iniciales; puede cambiarlo cuando quiera.</p>
     </form>` : ''}
     <div class="card rt-wrap ${puede.escribir() ? 'lg:col-span-2' : 'lg:col-span-3'}">
-      ${tabla(['Nombre', 'DNI', 'Comunidad', 'Parcelas', ''], ps.map((p) => [
+      ${tabla(['Nombre', 'DNI', 'Comunidad', 'Parcelas', 'En el pasaporte', ''], ps.map((p) => [
         esc(p.nombre), esc(p.dni || '—'), esc(p.comunidad || '—'), p.lotes,
+        puede.escribir()
+          ? `<label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer" title="Solo con autorización del productor">
+               <input type="checkbox" data-nombre="${p.id}" ${p.mostrar_nombre ? 'checked' : ''} class="accent-green-700"> ${p.mostrar_nombre ? 'Nombre completo' : 'Solo iniciales'}</label>`
+          : (p.mostrar_nombre ? 'Nombre completo' : 'Solo iniciales'),
         puede.admin() ? `<button class="btn2" data-del="${p.id}">Eliminar</button>` : '']), 'Aún no hay productores.')}
     </div>
   </div>`;
@@ -834,6 +841,12 @@ async function productores(app, msg = '') {
     try { const d = await api('/agro/productores', { method: 'POST', body: datosForm(f) }); await productores(app, aviso(d.encolado ? GUARDADO_SIN_RED : 'Productor guardado', 'ok')); }
     catch (err) { await productores(app, aviso(err.message)); }
   };
+  app.querySelectorAll('[data-nombre]').forEach((c) => c.onchange = async () => {
+    const mostrar = c.checked;
+    if (mostrar && !confirm('¿El productor autorizó mostrar su nombre completo en el pasaporte público? Lo verá cualquiera que escanee el QR.')) { c.checked = false; return; }
+    try { await api(`/agro/productores/${c.dataset.nombre}/privacidad`, { method: 'PATCH', body: { mostrar_nombre: mostrar } }); await productores(app, aviso(mostrar ? 'Su nombre completo se mostrará en el pasaporte.' : 'El pasaporte mostrará solo sus iniciales.', 'ok')); }
+    catch (err) { c.checked = !mostrar; alert(err.message); }
+  });
   app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
     if (!confirm('¿Eliminar al productor con todas sus parcelas, cosechas y entregas?')) return;
     try { await api('/agro/productores/' + b.dataset.del, { method: 'DELETE' }); await productores(app); } catch (err) { alert(err.message); }
@@ -1107,7 +1120,7 @@ async function pasaporte(app, cod) {
          + fila('Pactado con el productor', s.porcentaje_pactado != null ? num(s.porcentaje_pactado, 1) + ' % del precio' : '—')
          + fila('Recibió el productor', s.monto_productor != null ? `USD ${num(s.monto_productor, 2)} ${s.pagado ? '✓ pagado' : '(pendiente)'}` : '—') : ''}
       ${fila('Parcela de origen', `${esc(l.nombre)} (${esc(l.codigo)})`)}
-      ${fila('Productor', `${esc(l.productor.iniciales)}${l.productor.comunidad ? ' · ' + esc(l.productor.comunidad) : ''}`)}
+      ${fila('Productor', `${esc(l.productor.nombre || l.productor.iniciales)}${l.productor.comunidad ? ' · ' + esc(l.productor.comunidad) : ''}`)}
       ${fila('Superficie', l.hectareas != null ? num(l.hectareas, 2) + ' ha' : '—')}
       ${fila('Coordenadas', l.coordenadas ? `${l.coordenadas.lat}, ${l.coordenadas.lng} <span class="text-xs text-gray-400">(±100 m)</span>` : 'no registradas')}
       ${fila('No deforestación', l.sin_deforestacion.declarada ? `Declarada el ${esc((l.sin_deforestacion.fecha || '').slice(0, 10))}` : 'sin declaración')}

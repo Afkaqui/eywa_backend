@@ -21,7 +21,8 @@ export const agroRouter = new Hono();
 const codigo = (pref: string) => `${pref}-${randomBytes(4).toString('hex').toUpperCase()}`;
 
 // ── Pasaporte público (sin sesión) ───────────────────────────────────────────
-// Sin DNI, teléfono ni nombre completo del productor; coordenadas a ~100 m.
+// Sin DNI ni teléfono; coordenadas a ~100 m. El nombre completo del productor
+// solo si él lo autorizó (mostrarNombre); si no, sus iniciales.
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).map((p) => p[0].toUpperCase() + '.').join(' ');
 const redondear = (x: number | null) => (x == null ? null : Math.round(x * 1000) / 1000);
 
@@ -29,13 +30,16 @@ function serLotePublico(l: {
   codigo: string; nombre: string; cultivo: string; variedad: string | null; hectareas: number | null;
   departamento: string | null; provincia: string | null; distrito: string | null;
   latitud: number | null; longitud: number | null; sinDeforestacionDeclarada: boolean; declaradaAt: Date | null;
-  productor: { nombre: string; comunidad: string | null };
+  productor: { nombre: string; comunidad: string | null; mostrarNombre: boolean };
 }) {
   return {
     codigo: l.codigo, nombre: l.nombre, cultivo: l.cultivo, variedad: l.variedad, hectareas: l.hectareas,
     ubicacion: [l.distrito, l.provincia, l.departamento].filter(Boolean).join(', ') || null,
     coordenadas: l.latitud != null && l.longitud != null ? { lat: redondear(l.latitud), lng: redondear(l.longitud) } : null,
-    productor: { iniciales: iniciales(l.productor.nombre), comunidad: l.productor.comunidad },
+    productor: {
+      iniciales: iniciales(l.productor.nombre), comunidad: l.productor.comunidad,
+      ...(l.productor.mostrarNombre ? { nombre: l.productor.nombre } : {}),
+    },
     sin_deforestacion: l.sinDeforestacionDeclarada
       ? { declarada: true, fecha: l.declaradaAt?.toISOString() ?? null, tipo: 'declaracion_jurada', nota: 'Declaración del productor (fecha de corte EUDR: 31-12-2020). No es una verificación satelital.' }
       : { declarada: false },
@@ -249,12 +253,13 @@ agroRouter.get('/resumen', async (c) => {
 });
 
 // ── Productores ──
-const productorSchema = z.object({ nombre: z.string().trim().min(2, 'Nombre obligatorio').max(150), dni: txt, comunidad: txt, telefono: txt });
+const productorSchema = z.object({ nombre: z.string().trim().min(2, 'Nombre obligatorio').max(150), dni: txt, comunidad: txt, telefono: txt,
+  mostrar_nombre: z.union([z.boolean(), z.literal('on'), z.literal('true')]).optional().transform((v) => v === true || v === 'on' || v === 'true') });
 
 agroRouter.get('/productores', async (c) => {
   const { orgId } = await contexto(c);
   const ps = await db.agroProductor.findMany({ where: { organizacionId: orgId }, orderBy: { nombre: 'asc' }, include: { _count: { select: { lotes: true } } } });
-  return c.json({ productores: ps.map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, comunidad: p.comunidad, telefono: p.telefono, lotes: p._count.lotes })) });
+  return c.json({ productores: ps.map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, comunidad: p.comunidad, telefono: p.telefono, lotes: p._count.lotes, mostrar_nombre: p.mostrarNombre })) });
 });
 agroRouter.post('/productores', async (c) => {
   const { orgId, userId } = await contexto(c, ESCRIBEN);
@@ -262,8 +267,19 @@ agroRouter.post('/productores', async (c) => {
   if (d.dni && await db.agroProductor.findFirst({ where: { organizacionId: orgId, dni: d.dni } })) {
     throw new ApiError(409, 'Ya hay un productor con ese DNI en la organización');
   }
-  const p = await db.agroProductor.create({ data: { organizacionId: orgId, ownerId: userId, nombre: d.nombre, dni: d.dni || null, comunidad: d.comunidad ?? null, telefono: d.telefono ?? null } });
+  const p = await db.agroProductor.create({ data: { organizacionId: orgId, ownerId: userId, nombre: d.nombre, dni: d.dni || null, comunidad: d.comunidad ?? null, telefono: d.telefono ?? null,
+    mostrarNombre: d.mostrar_nombre, mostrarNombreAt: d.mostrar_nombre ? new Date() : null } });
   return c.json({ productor: { id: p.id } }, 201);
+});
+// El productor cambia de opinión sobre mostrar su nombre en el pasaporte público.
+agroRouter.patch('/productores/:id/privacidad', async (c) => {
+  const { orgId } = await contexto(c, ESCRIBEN);
+  await productorDeOrg(c.req.param('id'), orgId);
+  const b = await c.req.json().catch(() => ({}));
+  if (typeof b?.mostrar_nombre !== 'boolean') throw new ApiError(400, 'Indica si se muestra o no el nombre');
+  await db.agroProductor.update({ where: { id: c.req.param('id') },
+    data: { mostrarNombre: b.mostrar_nombre, mostrarNombreAt: b.mostrar_nombre ? new Date() : null } });
+  return c.json({ success: true });
 });
 agroRouter.delete('/productores/:id', async (c) => {
   const { orgId } = await contexto(c, ['admin']);
