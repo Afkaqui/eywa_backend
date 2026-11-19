@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import { bajasRouter } from '@/routes/bajas';
 import { logger } from 'hono/logger';
 import { corsMiddleware } from '@/middleware/cors';
 import { authRouter }           from '@/routes/auth';
@@ -85,6 +86,7 @@ app.route('/api/media',           mediaRouter);
 app.route('/api/funds',           fundsRouter);
 app.route('/api/notifications',   notificationsRouter);
 app.route('/api/stats',           statsRouter);
+app.route('/api/bajas',           bajasRouter); // solicitudes de baja de cuenta (Ley 29733)
 
 // API para sistemas de terceros: X-Api-Key en vez de sesión (§15).
 app.route('/api/external/v1',     externalRouter);

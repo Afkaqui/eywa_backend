@@ -84,6 +84,7 @@ model Profile {
   esgScore            EsgScore?
   esgHistory          EsgHistory[]
   projectPlans        ProjectPlan[]
+  solicitudesBaja     SolicitudBaja[]
   sectionProgress     SectionProgress[]
   examAttempts        ExamAttempt[]
   certificates        Certificate[]
@@ -934,4 +935,26 @@ model AgroEntrega {
 
   @@index([loteId])
   @@map("agro_entregas")
+}
+
+// Solicitudes de baja de cuenta (derecho de cancelación, Ley 29733). Cualquiera
+// puede pedirla desde /baja; un SUPERADMIN la revisa y elimina la cuenta o la
+// rechaza con una nota. Se conserva el registro (sin vínculo a la cuenta borrada)
+// como evidencia de que se atendió.
+model SolicitudBaja {
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String
+  nombre      String?
+  motivo      String?
+  estado      String    @default("pendiente") // pendiente | eliminada | rechazada
+  profileId   String?   @map("profile_id") @db.Uuid // cuenta encontrada con ese correo
+  nota        String?                                // respuesta del superadmin (se envía al rechazar)
+  resueltaPor String?   @map("resuelta_por")
+  resueltaAt  DateTime? @map("resuelta_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  profile Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([estado, createdAt])
+  @@map("solicitudes_baja")
 }
