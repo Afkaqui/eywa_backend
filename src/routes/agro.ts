@@ -130,11 +130,46 @@ agroRouter.get('/organizaciones', async (c) => {
     where: { profileId: u.sub }, orderBy: { createdAt: 'asc' },
     include: { organizacion: { include: { _count: { select: { productores: true, miembros: true } } } } },
   });
-  return c.json({ organizaciones: ms.map((m) => ({
-    id: m.organizacion.id, nombre: m.organizacion.nombre, ruc: m.organizacion.ruc, tipo: m.organizacion.tipo,
-    cadena: m.organizacion.cadena, region: m.organizacion.region, rol: m.rol,
-    productores: m.organizacion._count.productores, miembros: m.organizacion._count.miembros,
-  })) });
+  // Organizaciones de EYWA de esta persona que aún no tienen su par en Agro: se
+  // ofrecen para usarlas con un clic (antes Agro no las mostraba y había que
+  // crear la misma empresa de nuevo).
+  const eywa = await db.organization.findMany({
+    where: { userId: u.sub, agro: null }, orderBy: { createdAt: 'asc' },
+    select: { id: true, name: true, tradeName: true, ruc: true, sector: true, country: true },
+  });
+  return c.json({
+    organizaciones: ms.map((m) => ({
+      id: m.organizacion.id, nombre: m.organizacion.nombre, ruc: m.organizacion.ruc, tipo: m.organizacion.tipo,
+      cadena: m.organizacion.cadena, region: m.organizacion.region, rol: m.rol,
+      enlazada_eywa: !!m.organizacion.organizationId,
+      productores: m.organizacion._count.productores, miembros: m.organizacion._count.miembros,
+    })),
+    eywa_disponibles: eywa.map((o) => ({
+      id: o.id, nombre: o.tradeName?.trim() || o.name, razon_social: o.name, ruc: o.ruc, sector: o.sector, pais: o.country,
+    })),
+  });
+});
+
+// Usa una organización de EYWA en Agro: crea su par enlazado (quien la usa queda
+// como administrador). Solo el dueño de la organización de EYWA puede hacerlo.
+const enlazarSchema = z.object({
+  organization_id: z.string().uuid('Organización inválida'),
+  tipo:   z.enum(['cooperativa', 'asociacion', 'agroindustria', 'comprador', 'otro']).default('cooperativa'),
+  cadena: z.string().trim().min(2).max(60).default('cacao'),
+  region: txt,
+});
+agroRouter.post('/organizaciones/desde-eywa', async (c) => {
+  const u = getRequestUser(c);
+  const d = validar(enlazarSchema, await c.req.json().catch(() => ({})));
+  const o = await db.organization.findFirst({ where: { id: d.organization_id, userId: u.sub }, include: { agro: true } });
+  if (!o) throw new ApiError(404, 'No encontramos esa organización en tu cuenta de EYWA');
+  if (o.agro) throw new ApiError(409, 'Esa organización ya está en EYWA Agro');
+  const a = await db.agroOrganizacion.create({ data: {
+    nombre: o.tradeName?.trim() || o.name, ruc: o.ruc, tipo: d.tipo, cadena: d.cadena,
+    region: d.region ?? null, createdBy: u.sub, organizationId: o.id,
+    miembros: { create: { profileId: u.sub, rol: 'admin' } },
+  } });
+  return c.json({ organizacion: { id: a.id } }, 201);
 });
 
 agroRouter.post('/organizaciones', async (c) => {

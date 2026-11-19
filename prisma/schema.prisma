@@ -435,6 +435,7 @@ model Organization {
   grants            DataroomAccessGrant[]
   invitations       DataroomInvitation[]
   diagnosticResults DiagnosticResult[]
+  agro              AgroOrganizacion?
 
   @@unique([apiClientId, externalRef])
   @@map("organizations")
@@ -822,9 +823,13 @@ model AgroOrganizacion {
   cadena    String   @default("cacao")
   region    String?
   createdBy String?  @map("created_by") @db.Uuid
+  // Enlace con la organización de EYWA (la misma empresa en ambas plataformas).
+  // NULL = cooperativa creada solo en Agro.
+  organizationId String? @unique @map("organization_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
 
   creador     Profile?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  organizacionEywa Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   miembros    AgroMiembro[]
   productores AgroProductor[]
 

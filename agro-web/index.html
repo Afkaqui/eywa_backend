@@ -228,8 +228,11 @@ function modal(titulo, campos, alEnviar) {
   d.showModal();
 }
 
+let eywaDisponibles = []; // organizaciones de EYWA de la persona que aún no están en Agro
 async function cargarOrgs() {
-  orgs = (await api('/agro/organizaciones')).organizaciones;
+  const r = await api('/agro/organizaciones');
+  orgs = r.organizaciones;
+  eywaDisponibles = r.eywa_disponibles || [];
   const guardada = leer('agro_org');
   org = orgs.find((o) => o.id === guardada) || orgs[0] || null;
   if (org) guardar('agro_org', org.id);
@@ -543,6 +546,20 @@ function nuevaOrganizacion(app) {
     <h1 class="text-2xl font-semibold tracking-tight mb-2">${primera ? 'Crea tu organización' : 'Nueva organización'}</h1>
     <p class="text-sm text-gray-500 mb-5">${primera ? 'Todo en EYWA Agro se registra dentro de una organización: tu cooperativa, asociación o empresa. Tú quedarás como administrador y podrás sumar a tus técnicos de campo.' : 'Quedarás como administrador.'}</p>
     <div id="msg"></div>
+    ${eywaDisponibles.length ? `
+    <div class="card mb-4 !border-green-200 !bg-green-50/60">
+      <p class="font-semibold text-gray-900">Tus organizaciones de EYWA</p>
+      <p class="text-sm text-gray-600 mb-3">Úsala aquí con un clic: es la misma empresa en ambas plataformas, con tu misma cuenta.</p>
+      <div class="space-y-2">
+        ${eywaDisponibles.map((o) => `<div class="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 p-3">
+          <div class="w-10 h-10 rounded-xl bg-green-100 text-green-800 font-semibold flex items-center justify-center flex-shrink-0">${esc((o.nombre || '?').charAt(0).toUpperCase())}</div>
+          <div class="flex-1 min-w-0"><div class="font-medium truncate">${esc(o.nombre)}</div>
+            <div class="text-xs text-gray-500 truncate">${[o.sector, o.pais, o.ruc ? 'RUC ' + o.ruc : ''].filter(Boolean).map(esc).join(' · ')}</div></div>
+          <button class="btn !py-2" data-usar="${o.id}">Usar en Agro</button>
+        </div>`).join('')}
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 mb-2">O crea una organización solo para Agro (por ejemplo, una cooperativa distinta):</p>` : ''}
     <form id="f" class="card space-y-3">
       <label class="block"><span class="text-sm text-gray-600">Nombre</span><input class="inp mt-1" name="nombre" required placeholder="Cooperativa Agraria …"></label>
       <div class="grid sm:grid-cols-2 gap-3">
@@ -563,6 +580,13 @@ function nuevaOrganizacion(app) {
       guardar('agro_org', d.organizacion.id); orgs = []; ir('/');
     } catch (err) { $('#msg').innerHTML = aviso(err.message); }
   };
+  document.querySelectorAll('[data-usar]').forEach((b) => b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Agregando…';
+    try {
+      const d = await api('/agro/organizaciones/desde-eywa', { method: 'POST', body: { organization_id: b.dataset.usar } });
+      guardar('agro_org', d.organizacion.id); orgs = []; ir('/');
+    } catch (err) { $('#msg').innerHTML = aviso(err.message); b.disabled = false; b.textContent = 'Usar en Agro'; }
+  });
 }
 
 // ── Panel ──
@@ -603,6 +627,9 @@ async function panel(app) {
       </div>` : ''}
     </div>
   </section>
+  ${eywaDisponibles.length ? `<div class="card mb-5 flex flex-wrap items-center gap-3 !border-green-200 !bg-green-50/60 text-sm">
+    <span class="flex-1 min-w-[14rem]">Tienes ${eywaDisponibles.length === 1 ? `<b>${esc(eywaDisponibles[0].nombre)}</b>` : `<b>${eywaDisponibles.length} organizaciones</b>`} en EYWA que aún no usas en Agro.</span>
+    <a data-ir href="/organizaciones" class="btn2">Usarla en Agro</a></div>` : ''}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
     ${kpi('Productores', num(r.productores))}
     ${kpi('Parcelas georreferenciadas', pctGeo + '%', `${num(r.lotes_georreferenciados)} de ${num(r.lotes)} · ${num(r.hectareas, 2)} ha`, pctGeo)}
