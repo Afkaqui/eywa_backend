@@ -22,7 +22,8 @@
 <meta name="twitter:description" content="Lotes georreferenciados, centro de acopio digital y pasaporte con QR para cada saco.">
 <meta name="twitter:image" content="https://agro.encsust4in4ble.earth/og.png">
 <link rel="icon" href="/logo.png">
-<link rel="apple-touch-icon" href="/logo.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
@@ -131,6 +132,7 @@
     <button id="hamb" class="lg:hidden btn2 shrink-0" aria-label="Menú" aria-expanded="false">☰</button>
   </div>
   <nav id="nav" class="max-w-6xl mx-auto px-4 pb-2 hidden lg:flex flex-wrap gap-1 text-sm"></nav>
+  <div id="red"></div>
 </header>
 <main id="app" class="max-w-6xl mx-auto px-4 py-6"></main>
 <dialog id="dlg"></dialog>
@@ -159,18 +161,99 @@ let orgs = [];          // organizaciones del usuario
 let org = null;         // activa
 const puede = { escribir: () => org && org.rol !== 'lector', admin: () => org && org.rol === 'admin' };
 
+// ── Sin internet ─────────────────────────────────────────────────────────────
+// Lo que se registra en el campo sin señal (productores, parcelas, cosechas,
+// entregas) se guarda en el teléfono y se envía solo al volver la conexión.
+// Las pantallas de consulta usan la última copia que guardó el service worker.
+const ENCOLABLES = [/^\/agro\/productores$/, /^\/agro\/lotes$/, /^\/agro\/lotes\/[^/]+\/cosechas$/, /^\/agro\/entregas$/];
+const ETIQUETA = { productores: 'Productor', lotes: 'Parcela', cosechas: 'Cosecha', entregas: 'Entrega' };
+const pendientes = () => { try { return JSON.parse(localStorage.getItem('agro_pendientes') || '[]'); } catch { return []; } };
+const guardarPendientes = (l) => { try { localStorage.setItem('agro_pendientes', JSON.stringify(l)); } catch {} pintarRed(); };
+let enviando = false;
+
+function pintarRed() {
+  const el = $('#red'); if (!el) return;
+  const n = token ? pendientes().length : 0;
+  const errores = pendientes().filter((x) => x.error).length;
+  if (navigator.onLine && !n) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="${navigator.onLine ? 'bg-amber-50 text-amber-900' : 'bg-gray-900 text-white'} text-sm">
+    <div class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span class="font-semibold">${navigator.onLine ? 'Con conexión' : '● Sin conexión'}</span>
+      <span class="opacity-80">${navigator.onLine ? '' : 'Puedes seguir registrando: se guarda en este teléfono.'}</span>
+      ${n ? `<span class="ml-auto">${n} registro${n === 1 ? '' : 's'} por enviar${errores ? ` · ${errores} con error` : ''}</span>
+        <a data-ir href="/pendientes" class="underline font-semibold">Ver</a>
+        ${navigator.onLine ? '<button id="enviarYa" class="underline font-semibold">Enviar ahora</button>' : ''}` : ''}
+    </div></div>`;
+  const b = $('#enviarYa'); if (b) b.onclick = () => sincronizar(true);
+}
+
+async function sincronizar(manual = false) {
+  if (enviando || !token || !navigator.onLine) return;
+  const lista = pendientes(); if (!lista.length) return;
+  enviando = true;
+  let ok = 0;
+  try {
+    for (const it of lista) {
+      if (it.error && !manual) continue; // los que fallaron esperan a que la persona los revise
+      try {
+        const r = await fetch('/api' + it.ruta, {
+          method: it.method,
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-Agro-Org': it.org },
+          body: it.body ? JSON.stringify(it.body) : undefined,
+        });
+        if (r.status === 401) { salir(); return; }
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) { guardarPendientes(pendientes().filter((x) => x.id !== it.id)); ok++; }
+        else guardarPendientes(pendientes().map((x) => x.id === it.id ? { ...x, error: d.error || ('Error ' + r.status) } : x));
+      } catch { break; } // se cortó la señal otra vez: se reintenta luego
+    }
+  } finally { enviando = false; pintarRed(); }
+  if (ok) { flash(`Se enviaron ${ok} registro${ok === 1 ? '' : 's'} guardados sin conexión.`); if (location.pathname !== '/pendientes') render(); }
+}
+function flash(t) {
+  const d = document.createElement('div');
+  d.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-green-800 text-white text-sm px-4 py-2.5 rounded-full shadow-lg';
+  d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 4000);
+}
+window.addEventListener('online', () => { pintarRed(); sincronizar(); });
+window.addEventListener('offline', pintarRed);
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+
 async function api(ruta, opt = {}) {
-  const r = await fetch('/api' + ruta, {
-    method: opt.method || 'GET',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(org ? { 'X-Agro-Org': org.id } : {}) },
-    body: opt.body ? JSON.stringify(opt.body) : undefined,
-  });
+  const metodo = opt.method || 'GET';
+  const encolar = () => {
+    const tipo = ruta.split('/').filter(Boolean).pop();
+    const it = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ruta, method: metodo, body: opt.body ?? null,
+      org: org?.id, orgNombre: org?.nombre, tipo: ETIQUETA[tipo] || 'Registro', at: new Date().toISOString() };
+    guardarPendientes([...pendientes(), it]);
+    return { encolado: true };
+  };
+  const puedeEncolar = metodo === 'POST' && org && ENCOLABLES.some((re) => re.test(ruta));
+  if (puedeEncolar && !navigator.onLine) return encolar();
+  let r;
+  try {
+    r = await fetch('/api' + ruta, {
+      method: metodo,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(org ? { 'X-Agro-Org': org.id } : {}) },
+      body: opt.body ? JSON.stringify(opt.body) : undefined,
+    });
+  } catch (e) {
+    if (puedeEncolar) return encolar(); // la señal se cayó justo al enviar
+    throw new Error(navigator.onLine ? 'No se pudo conectar con el servidor' : 'Sin conexión: esta acción necesita internet');
+  }
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && token) { salir(); throw new Error('Tu sesión expiró'); }
   if (!r.ok && !opt.aceptar?.includes(r.status)) throw new Error(d.error || ('Error ' + r.status));
   return opt.conEstado ? { status: r.status, d } : d;
 }
-function salir() { token = null; org = null; orgs = []; guardar('agro_token', null); guardar('agro_org', null); ir('/'); }
+function salir(preguntar = false) {
+  const n = pendientes().length;
+  if (preguntar && n && !confirm(`Tienes ${n} registro${n === 1 ? '' : 's'} guardado${n === 1 ? '' : 's'} sin conexión que aún no se enviaron. Si sales, se perderán. ¿Salir igual?`)) return;
+  token = null; org = null; orgs = []; guardar('agro_token', null); guardar('agro_org', null);
+  if (preguntar) guardarPendientes([]);
+  navigator.serviceWorker?.controller?.postMessage('limpiar'); // borra la copia de datos de este teléfono
+  ir('/');
+}
 function ir(ruta) { history.pushState({}, '', ruta); window.scrollTo(0, 0); render(); }
 window.ir = ir;
 window.addEventListener('popstate', render);
@@ -184,7 +267,7 @@ function cabecera() {
     ...(puede.escribir() ? [['/importar', 'Importar Excel']] : []), ['/equipo', 'Equipo'], ['/fondos', 'Fondos'], ['/actores', 'Actores'], ['/glosario', 'Glosario']] : [];
   $('#nav').innerHTML = items.map(([h, t]) => `<a data-ir href="${h}" class="px-3 py-2 rounded-full whitespace-nowrap ${location.pathname === h ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}">${t}</a>`).join('')
     + (token ? '<button id="salir" class="px-3 py-2 text-gray-500 hover:text-gray-800 text-left">Salir</button>' : '');
-  const s = $('#salir'); if (s) s.onclick = salir;
+  const s = $('#salir'); if (s) s.onclick = () => salir(true);
   $('#hamb').style.display = token ? '' : 'none';
   $('#orgsel').innerHTML = token && orgs.length ? `
     <select id="org" class="inp !py-1.5 !text-sm max-w-[13rem] sm:max-w-xs truncate" aria-label="Organización activa">
@@ -256,7 +339,7 @@ async function render() {
   cerrarMenu();
   try {
     if (!orgs.length) await cargarOrgs();
-    cabecera();
+    cabecera(); pintarRed(); sincronizar();
     if (!org || p === '/organizaciones') return nuevaOrganizacion(app);
     if (p === '/productores') return await productores(app);
     if (p === '/lotes') return await lotes(app);
@@ -266,6 +349,7 @@ async function render() {
     if (p === '/fondos') return await fondos(app);
     if (p === '/actores') return await actores(app);
     if (p === '/glosario') return await glosario(app);
+    if (p === '/pendientes') return pendientesVista(app);
     return await panel(app);
   } catch (e) { app.innerHTML = aviso(e.message); }
 }
@@ -496,6 +580,32 @@ function animarLanding(app) {
 }
 
 // ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
+const GUARDADO_SIN_RED = 'Sin conexión: quedó guardado en este teléfono y se enviará solo al volver la señal.';
+
+// ── Registros guardados sin conexión ──
+function pendientesVista(app) {
+  const l = pendientes();
+  const desc = (it) => {
+    const b = it.body || {};
+    return esc(b.nombre || b.codigo_lote || (b.kilos ? `${b.kilos} kg` : '') || (b.kg ? `${b.kg} kg` : '') || '');
+  };
+  app.innerHTML = `
+  <h1 class="text-2xl font-semibold tracking-tight mb-1">Por enviar</h1>
+  <p class="text-sm text-gray-500 mb-5">Registros hechos sin conexión. Se envían solos cuando vuelve la señal; los que el servidor rechazó necesitan que los revises.</p>
+  ${l.length ? `<div class="space-y-2">${l.map((it) => `<div class="card !p-4 flex flex-wrap items-center gap-3 ${it.error ? '!border-red-200' : ''}">
+      <div class="flex-1 min-w-[12rem]"><div class="font-medium">${esc(it.tipo)} ${desc(it) ? '· ' + desc(it) : ''}</div>
+        <div class="text-xs text-gray-500">${esc(it.orgNombre || '')} · guardado el ${new Date(it.at).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+        ${it.error ? `<div class="text-xs text-red-700 mt-1">No se pudo enviar: ${esc(it.error)}</div>` : ''}</div>
+      <button class="btn2" data-quitar="${it.id}">Descartar</button></div>`).join('')}</div>
+    ${navigator.onLine ? '<button id="enviarTodo" class="btn mt-4">Enviar ahora</button>' : '<p class="text-sm text-gray-500 mt-4">Se enviarán cuando haya conexión.</p>'}`
+  : '<div class="card text-sm text-gray-500">No hay nada pendiente: todo está enviado.</div>'}`;
+  app.querySelectorAll('[data-quitar]').forEach((b) => b.onclick = () => {
+    if (!confirm('¿Descartar este registro? No se enviará.')) return;
+    guardarPendientes(pendientes().filter((x) => x.id !== b.dataset.quitar)); pendientesVista(app);
+  });
+  const e = $('#enviarTodo'); if (e) e.onclick = async () => { await sincronizar(true); pendientesVista(app); };
+}
+
 // ── Entrada única desde EYWA ──
 // Llega con #c=<código>&a=<ruta>. El código se canjea UNA vez por el token y se
 // borra de la barra de direcciones de inmediato.
@@ -721,7 +831,7 @@ async function productores(app, msg = '') {
   const f = $('#f');
   if (f) f.onsubmit = async (e) => {
     e.preventDefault();
-    try { await api('/agro/productores', { method: 'POST', body: datosForm(f) }); await productores(app, aviso('Productor guardado', 'ok')); }
+    try { const d = await api('/agro/productores', { method: 'POST', body: datosForm(f) }); await productores(app, aviso(d.encolado ? GUARDADO_SIN_RED : 'Productor guardado', 'ok')); }
     catch (err) { await productores(app, aviso(err.message)); }
   };
   app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
@@ -769,14 +879,14 @@ async function lotes(app, msg = '') {
       () => alert('No se pudo obtener la ubicación'), { enableHighAccuracy: true, timeout: 15000 });
     f.onsubmit = async (e) => {
       e.preventDefault();
-      try { await api('/agro/lotes', { method: 'POST', body: datosForm(f) }); await lotes(app, aviso('Parcela guardada con su pasaporte', 'ok')); }
+      try { const d = await api('/agro/lotes', { method: 'POST', body: datosForm(f) }); await lotes(app, aviso(d.encolado ? GUARDADO_SIN_RED + ' El pasaporte se genera al enviarse.' : 'Parcela guardada con su pasaporte', 'ok')); }
       catch (err) { await lotes(app, aviso(err.message)); }
     };
   }
   app.querySelectorAll('[data-cos]').forEach((b) => b.onclick = () => modal('Registrar cosecha', [
     { n: 'kilos', t: 'Kilos cosechados', tipo: 'number', num: true, req: true, min: 0 },
     { n: 'fecha', t: 'Fecha', tipo: 'date', v: hoy(), req: true },
-  ], async (d) => { await api(`/agro/lotes/${b.dataset.cos}/cosechas`, { method: 'POST', body: d }); await lotes(app, aviso('Cosecha registrada', 'ok')); }));
+  ], async (d) => { const r = await api(`/agro/lotes/${b.dataset.cos}/cosechas`, { method: 'POST', body: d }); await lotes(app, aviso(r.encolado ? GUARDADO_SIN_RED : 'Cosecha registrada', 'ok')); }));
   app.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
     if (!confirm('¿Eliminar la parcela con sus cosechas y entregas?')) return;
     try { await api('/agro/lotes/' + b.dataset.del, { method: 'DELETE' }); await lotes(app); } catch (err) { alert(err.message); }
@@ -809,7 +919,7 @@ async function acopio(app, msg = '') {
   const f = $('#f');
   if (f) f.onsubmit = async (e) => {
     e.preventDefault();
-    try { const d = await api('/agro/entregas', { method: 'POST', body: datosForm(f) }); await acopio(app, aviso(`Saco ${d.entrega.codigo} registrado. Su pasaporte: /p/${d.entrega.codigo}`, 'ok')); }
+    try { const d = await api('/agro/entregas', { method: 'POST', body: datosForm(f) }); await acopio(app, aviso(d.encolado ? GUARDADO_SIN_RED + ' El código del saco y su QR se generan al enviarse.' : `Saco ${d.entrega.codigo} registrado. Su pasaporte: /p/${d.entrega.codigo}`, 'ok')); }
     catch (err) { await acopio(app, aviso(err.message)); }
   };
   app.querySelectorAll('[data-venta]').forEach((b) => b.onclick = () => modal('Registrar venta', [
