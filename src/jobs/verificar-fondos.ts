@@ -22,7 +22,10 @@ const claveFecha = (d: Date) => `fecha:${d.toISOString().slice(0, 10)}`;
 
 async function main() {
   const run = SIMULAR ? null : await db.fundSyncRun.create({ data: { kind: 'verificacion' } });
+  // Los candidatos (fondos nuevos sin aprobar) no se re-verifican: su revisión
+  // pendiente es la de aprobarlos, y esta pasada la sobrescribiría.
   const fondos = await db.fund.findMany({
+    where: { candidate: false },
     select: { id: true, name: true, url: true, deadline: true, dismissedDetection: true },
   });
 

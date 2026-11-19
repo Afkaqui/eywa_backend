@@ -28,8 +28,8 @@ async function assertPremium(userId: string) {
 // ── GET /api/funds/summary — conteos para el teaser (cualquier usuario logueado) ──
 fundsRouter.get('/summary', async (c) => {
   const [total, nacionales] = await Promise.all([
-    db.fund.count(),
-    db.fund.count({ where: { scope: 'nacional' } }),
+    db.fund.count({ where: { candidate: false } }),
+    db.fund.count({ where: { scope: 'nacional', candidate: false } }),
   ]);
   return c.json({ total, nacionales, internacionales: total - nacionales });
 });
@@ -40,7 +40,7 @@ fundsRouter.get('/', async (c) => {
   await assertPremium(user.sub);
 
   const [funds, org] = await Promise.all([
-    db.fund.findMany({ orderBy: [{ deadline: 'asc' }, { name: 'asc' }] }),
+    db.fund.findMany({ where: { candidate: false }, orderBy: [{ deadline: 'asc' }, { name: 'asc' }] }),
     db.organization.findFirst({ where: { userId: user.sub  }, orderBy: { createdAt: "asc" }, select: { sector: true } }),
   ]);
 
@@ -119,7 +119,7 @@ fundsRouter.get('/revision', async (c) => {
   assertRole(user, ['gestor', 'admin', 'superadmin']);
 
   const [pendientes, ultima] = await Promise.all([
-    db.fund.findMany({ where: { needsReview: true }, orderBy: [{ detectedDeadline: 'asc' }, { name: 'asc' }] }),
+    db.fund.findMany({ where: { needsReview: true }, orderBy: [{ candidate: 'desc' }, { detectedDeadline: 'asc' }, { name: 'asc' }] }),
     db.fundSyncRun.findFirst({ where: { kind: 'verificacion' }, orderBy: { startedAt: 'desc' } }),
   ]);
 
@@ -144,12 +144,14 @@ fundsRouter.get('/revision', async (c) => {
       detected_deadline: f.detectedDeadline?.toISOString() ?? null,
       detected_evidence: f.detectedEvidence,
       review_reason:     f.reviewReason,
+      candidato:         f.candidate,
+      descubierto_en:    f.discoveredFrom,
     })),
   });
 });
 
 // POST /api/funds/:id/revision  { accion: 'aceptar_fecha' | 'descartar' }
-const revisionSchema = z.object({ accion: z.enum(['aceptar_fecha', 'descartar']) });
+const revisionSchema = z.object({ accion: z.enum(['aceptar_fecha', 'descartar', 'aprobar']) });
 
 fundsRouter.post('/:id/revision', async (c) => {
   const user = getRequestUser(c);
@@ -160,6 +162,20 @@ fundsRouter.post('/:id/revision', async (c) => {
   const f = await db.fund.findUnique({ where: { id: c.req.param('id') } });
   if (!f) throw new ApiError(404, 'Fondo no encontrado');
   if (!f.needsReview) throw new ApiError(409, 'Este fondo ya no tiene nada pendiente de revisión');
+
+  // Fondo nuevo descubierto por el bot: aprobar lo publica en el catálogo;
+  // descartarlo lo deja oculto (para no redescubrirlo mañana).
+  if (f.candidate) {
+    if (parsed.data.accion === 'aceptar_fecha') throw new ApiError(400, 'Primero aprueba o descarta el fondo nuevo');
+    await db.fund.update({
+      where: { id: f.id },
+      data: parsed.data.accion === 'aprobar'
+        ? { candidate: false, needsReview: false, reviewReason: null }
+        : { needsReview: false, reviewReason: null, dismissedDetection: 'candidato_descartado' },
+    });
+    return c.json({ success: true });
+  }
+  if (parsed.data.accion === 'aprobar') throw new ApiError(400, 'Este fondo ya está en el catálogo');
 
   if (parsed.data.accion === 'aceptar_fecha') {
     if (!f.detectedDeadline) throw new ApiError(409, 'No hay una fecha propuesta que aceptar');
@@ -213,7 +229,7 @@ fundsRouter.patch('/:id', async (c) => {
   try {
     // Una edición humana resuelve lo que hubiera pendiente: si corrigió la URL o la
     // fecha, la próxima verificación partirá de lo nuevo.
-    const actual = await db.fund.findUnique({ where: { id: c.req.param('id') }, select: { deadline: true } });
+    const actual = await db.fund.findUnique({ where: { id: c.req.param('id') }, select: { deadline: true, candidate: true } });
     const datos = toFundData(parsed.data);
     const cambioFecha = (actual?.deadline?.getTime() ?? null) !== (datos.deadline?.getTime() ?? null);
     await db.fund.update({
@@ -221,7 +237,8 @@ fundsRouter.patch('/:id', async (c) => {
       data: {
         ...datos,
         ...(cambioFecha ? { deadlineSource: 'manual' } : {}),
-        needsReview: false, reviewReason: null, dismissedDetection: null,
+        // Un candidato sigue esperando su aprobación aunque se edite.
+        ...(actual?.candidate ? {} : { needsReview: false, reviewReason: null, dismissedDetection: null }),
       },
     });
   } catch {

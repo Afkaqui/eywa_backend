@@ -30,7 +30,7 @@ statsRouter.get('/public', async (c) => {
     db.organization.count({ where: notDemo }),
     db.diagnosticResult.count(),
     db.actor.count(),
-    db.fund.count(),
+    db.fund.count({ where: { candidate: false } }),
     db.certificate.count(),
     db.dataroomDocument.count({ where: { organization: notDemo } }),
   ]);
@@ -229,7 +229,7 @@ statsRouter.get('/me', async (c) => {
   const now = new Date();
   const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
   const openFunds = await db.fund.findMany({
-    where: { OR: [{ deadline: { gte: now } }, { deadline: null }] },
+    where: { candidate: false, OR: [{ deadline: { gte: now } }, { deadline: null }] },
     select: { id: true, name: true, sectorTags: true, deadline: true, scope: true },
   });
   const myTags = tagsForSector(org?.sector);

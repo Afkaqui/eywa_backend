@@ -68,7 +68,7 @@ notificationsRouter.get('/', async (c) => {
   const now = new Date();
   const in15 = new Date(now.getTime() + 15 * 24 * 3600 * 1000);
   const closing = await db.fund.findMany({
-    where:   { deadline: { gte: now, lte: in15 } },
+    where:   { deadline: { gte: now, lte: in15 }, candidate: false },
     orderBy: { deadline: 'asc' },
     take:    3,
     select:  { name: true, deadline: true },

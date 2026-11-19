@@ -478,6 +478,13 @@ model Fund {
   reviewReason     String?   @map("review_reason")
   dismissedDetection String? @map("dismissed_detection") // lo ya descartado por un gestor; no se re-propone
 
+  // ── Descubrimiento de fondos nuevos (PENDIENTES §16.2, fase 2) ──
+  // Un fondo encontrado por el bot entra OCULTO (candidate=true) hasta que un
+  // gestor lo aprueba. Si lo descarta, queda oculto para no redescubrirlo.
+  candidate      Boolean   @default(false)
+  discoveredFrom String?   @map("discovered_from") // prociencia | …
+  discoveredAt   DateTime? @map("discovered_at")
+
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
