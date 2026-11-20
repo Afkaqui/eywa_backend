@@ -1094,7 +1094,8 @@ async function glosario(app) {
   <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">${esc(d.estado)}</p>
   ${cats.map((c) => `<div class="mb-6"><div class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">${esc(c)}</div>
     ${d.terminos.filter((t) => t.categoria === c).map((t) => `<div class="mb-3"><div class="font-medium text-sm">${esc(t.termino)}${t.sigla ? ` <span class="text-emerald-700">· ${esc(t.sigla)}</span>` : ''}</div>
-    <div class="text-sm text-gray-600">${esc(t.definicion)}</div></div>`).join('')}</div>`).join('')}`;
+    <div class="text-sm text-gray-600">${esc(t.definicion)}</div>
+    ${t.fuente ? `<div class="text-xs text-gray-400 mt-0.5">Fuente: ${t.fuente.url ? `<a href="${esc(t.fuente.url)}" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline">${esc(t.fuente.nombre)}</a>` : esc(t.fuente.nombre)}</div>` : ''}</div>`).join('')}</div>`).join('')}`;
 }
 
 // ── Pasaporte público ──
