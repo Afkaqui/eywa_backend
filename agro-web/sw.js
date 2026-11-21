@@ -16,8 +16,8 @@ const CACHE_API = 'agro-api';
 
 const APP = [
   '/',
-  '/logo.png',
-  '/manifest.webmanifest',
+  '/logo.png?v=2',
+  '/manifest.webmanifest?v=2',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

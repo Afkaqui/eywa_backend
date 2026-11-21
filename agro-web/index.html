@@ -13,17 +13,17 @@
 <meta property="og:url" content="https://agro.encsust4in4ble.earth/">
 <meta property="og:title" content="UNANCHA Agro · Trazabilidad de cacao del lote al saco">
 <meta property="og:description" content="Lotes georreferenciados, centro de acopio digital y un pasaporte con QR para cada saco: de dónde viene, cuándo se vendió y cuánto recibió el productor.">
-<meta property="og:image" content="https://agro.encsust4in4ble.earth/og.png">
+<meta property="og:image" content="https://agro.encsust4in4ble.earth/og.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="UNANCHA Agro: del lote al saco, trazable y justo">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="UNANCHA Agro · Trazabilidad de cacao del lote al saco">
 <meta name="twitter:description" content="Lotes georreferenciados, centro de acopio digital y pasaporte con QR para cada saco.">
-<meta name="twitter:image" content="https://agro.encsust4in4ble.earth/og.png">
-<link rel="icon" href="/logo.png">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="manifest" href="/manifest.webmanifest">
+<meta name="twitter:image" content="https://agro.encsust4in4ble.earth/og.png?v=2">
+<link rel="icon" href="/logo.png?v=2">
+<link rel="apple-touch-icon" href="/icon-192.png?v=2">
+<link rel="manifest" href="/manifest.webmanifest?v=2">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   // Identidad UNANCHA (Dossier_UNANCHA_001 §1.5): cacao para la marca y los textos,
@@ -139,7 +139,7 @@
 <header id="cab" class="bg-white border-b border-gray-200 sticky top-0 z-30">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
     <a href="/" data-ir class="flex items-center gap-2 min-w-0">
-      <img src="/logo.png" alt="UNANCHA" class="w-9 h-9 object-contain shrink-0">
+      <img src="/logo.png?v=2" alt="UNANCHA" class="w-9 h-9 object-contain shrink-0">
       <span class="leading-tight hidden sm:block"><span class="block font-marca font-extrabold tracking-wide">UNANCHA <span class="text-emerald-600">AGRO</span></span>
       <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
       <span class="font-marca font-extrabold hidden min-[400px]:inline sm:hidden whitespace-nowrap text-[15px]">UNANCHA <span class="text-emerald-600">AGRO</span></span>
@@ -418,7 +418,7 @@ function landing(app) {
     <nav class="sticky top-0 z-40 bg-white/95 border-b border-gray-100 backdrop-blur">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <a href="/" data-ir class="flex items-center gap-2.5">
-          <img src="/logo.png" alt="UNANCHA" class="w-9 h-9 object-contain">
+          <img src="/logo.png?v=2" alt="UNANCHA" class="w-9 h-9 object-contain">
           <span class="leading-tight"><span class="block font-marca font-extrabold text-lg tracking-wide">UNANCHA <span class="text-green-700">AGRO</span></span>
           <span class="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-emerald-700">Del lote al saco</span></span>
         </a>
@@ -558,7 +558,7 @@ function landing(app) {
 
     <footer class="bg-gray-950 text-gray-400">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-        <div class="flex flex-wrap items-center justify-center gap-3"><img src="/logo.png" alt="UNANCHA" class="w-8 h-8 rounded-lg bg-white object-contain"><span class="font-semibold text-white">UNANCHA Agro</span><span>· Del lote al saco, trazable y justo</span></div>
+        <div class="flex flex-wrap items-center justify-center gap-3"><img src="/logo.png?v=2" alt="UNANCHA" class="w-8 h-8 rounded-lg bg-white object-contain"><span class="font-semibold text-white">UNANCHA Agro</span><span>· Del lote al saco, trazable y justo</span></div>
         <span class="text-xs">Proyecto financiado por ProInnóvate · DER Cusco</span>
       </div>
     </footer>
@@ -651,7 +651,7 @@ function login(app) {
       <div class="w-full max-w-md">
         <a href="/" data-ir class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Volver a UNANCHA Agro</a>
         <div class="flex items-center gap-3 mb-10">
-          <img src="/logo.png" alt="UNANCHA" class="w-12 h-12 object-contain">
+          <img src="/logo.png?v=2" alt="UNANCHA" class="w-12 h-12 object-contain">
           <div><div class="font-marca text-gray-900 font-extrabold text-2xl tracking-tight">UNANCHA <span class="text-emerald-600">AGRO</span></div>
           <div class="text-emerald-600 text-xs tracking-wider">ORQUESTACIÓN DE ECOSISTEMAS</div></div>
         </div>
@@ -659,7 +659,7 @@ function login(app) {
         <p class="text-gray-600 mb-6">Tu cuenta de UNANCHA es la misma. Si ya entraste en UNANCHA, no necesitas tu contraseña.</p>
         <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde UNANCHA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
         <a href="${ENTRAR_CON_EYWA}" class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 flex items-center justify-center gap-2 mb-6">
-          <img src="/logo.png" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de UNANCHA</a>
+          <img src="/logo.png?v=2" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de UNANCHA</a>
         <div class="flex items-center gap-3 text-xs text-gray-400 mb-6"><span class="flex-1 h-px bg-gray-200"></span>o con tu correo<span class="flex-1 h-px bg-gray-200"></span></div>
         <form id="f" class="space-y-5">
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</span>
