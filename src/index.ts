@@ -50,7 +50,7 @@ app.use('*', async (c, next) => {
     if (m) {
       const cod = m[1].toUpperCase();
       const tipo = cod.startsWith('SC') ? 'saco' : 'lote';
-      const titulo = `Pasaporte digital del ${tipo} ${cod} · EYWA Agro`;
+      const titulo = `Pasaporte digital del ${tipo} ${cod} · UNANCHA Agro`;
       const desc = `Origen, georreferencia, declaración de no deforestación${tipo === 'saco' ? ', venta y pago al productor' : ' y cosechas'} del ${tipo} ${cod}.`;
       const url = `https://agro.encsust4in4ble.earth/p/${cod}`;
       html = html
@@ -67,7 +67,7 @@ app.use('*', async (c, next) => {
 });
 
 // Health check
-app.get('/', (c) => c.json({ status: 'ok', service: 'EYWA API', version: '1.0.0' }));
+app.get('/', (c) => c.json({ status: 'ok', service: 'UNANCHA API', version: '1.0.0' }));
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // Rutas
@@ -108,7 +108,7 @@ app.onError((err, c) => {
 app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
 
 const port = Number(process.env.PORT ?? 4001);
-console.log(`🚀 EYWA API corriendo en http://localhost:${port}`);
+console.log(`🚀 UNANCHA API corriendo en http://localhost:${port}`);
 
 serve({ fetch: app.fetch, port });
 

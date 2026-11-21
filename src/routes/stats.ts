@@ -224,7 +224,7 @@ statsRouter.get('/me', async (c) => {
 
   // ── Fondos que encajan con mi sector y cierran pronto ──
   // Match EXACTO por etiquetas temáticas (2026-07-18): los fondos están etiquetados
-  // con la taxonomía EYWA y cada industria de empresa se mapea a los temas que le
+  // con la taxonomía UNANCHA y cada industria de empresa se mapea a los temas que le
   // corresponden. Los fondos "multisectorial" aplican a todos.
   const now = new Date();
   const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);

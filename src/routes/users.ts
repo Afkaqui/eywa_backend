@@ -167,13 +167,13 @@ usersRouter.post('/:id/password', async (c) => {
     const saludo = objetivo.fullName ? `Hola ${objetivo.fullName},` : 'Hola,';
     const r = await sendMail({
       to:      objetivo.email,
-      subject: 'Un administrador cambió la contraseña de tu cuenta EYWA',
+      subject: 'Un administrador cambió la contraseña de tu cuenta UNANCHA',
       html: baseTemplate({
         title: 'Tu contraseña fue cambiada',
         bodyHtml: `
           <p style="margin:0 0 12px;">${saludo}</p>
           <p style="margin:0 0 12px;">
-            Un administrador de EYWA fijó una contraseña nueva para tu cuenta
+            Un administrador de UNANCHA fijó una contraseña nueva para tu cuenta
             <strong>${objetivo.email}</strong>. Debería habértela entregado por otro medio.
           </p>
           <p style="margin:0 0 12px;">
@@ -182,11 +182,11 @@ usersRouter.post('/:id/password', async (c) => {
           <p style="margin:0 0 12px;">
             <strong>Si no esperabas este cambio</strong>, escríbenos de inmediato.
           </p>
-          <p style="margin:0;"><a href="${appUrl('/')}">Ir a EYWA</a></p>`,
+          <p style="margin:0;"><a href="${appUrl('/')}">Ir a UNANCHA</a></p>`,
       }),
       text: `${saludo}
 
-Un administrador de EYWA fijó una contraseña nueva para tu cuenta `
+Un administrador de UNANCHA fijó una contraseña nueva para tu cuenta `
           + `${objetivo.email}. Cámbiala desde Configuración cuando entres. `
           + `Si no esperabas este cambio, escríbenos de inmediato.`,
     }).catch(() => ({ ok: false }));

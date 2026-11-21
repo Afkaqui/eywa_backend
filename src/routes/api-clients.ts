@@ -17,7 +17,7 @@ import { db } from '@/lib/db';
 //             anterior deja de funcionar en el acto
 //   revocar → la clave deja de funcionar; el cliente y sus empresas se conservan
 //
-// La clave en claro solo existe en la respuesta de emitir/rotar. EYWA guarda su
+// La clave en claro solo existe en la respuesta de emitir/rotar. UNANCHA guarda su
 // sha256, así que si se pierde no se recupera: se rota.
 
 export const apiClientsRouter = new Hono();
@@ -103,7 +103,7 @@ apiClientsRouter.post('/', async (c) => {
   return c.json({
     cliente: serCliente(cliente),
     clave:   k.clave,
-    nota:    'Esta es la única vez que se muestra la clave. EYWA no la guarda en claro.',
+    nota:    'Esta es la única vez que se muestra la clave. UNANCHA no la guarda en claro.',
   }, 201);
 });
 

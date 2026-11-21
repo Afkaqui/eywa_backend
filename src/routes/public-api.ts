@@ -13,7 +13,7 @@ import { GLOSARIO, GLOSARIO_VERSION, GLOSARIO_ESTADO } from '@/lib/glosario';
 // Solo lectura y solo lo que ya es público en la plataforma:
 //   · directorio de actores SIN datos de contacto (la PII nunca sale por aquí);
 //   · verificación de certificados (ya era pública);
-//   · perfil público de una empresa: la fuente del sello "ESG verificado por EYWA"
+//   · perfil público de una empresa: la fuente del sello "ESG verificado por UNANCHA"
 //     que la empresa pega en su propia web.
 //
 // Lo que exige identificarse (dar de alta empresas, puntajes GENES) va por la capa
@@ -168,13 +168,13 @@ publicApiRouter.get('/empresas/:slug', async (c) => {
       porcentaje:      completitud.percentage,
     },
     // Qué certifica el sello y qué no: lo documentado, no la calidad de lo documentado.
-    aviso: 'El porcentaje indica cuánta documentación de la empresa está cargada en su dataroom de EYWA. ' +
+    aviso: 'El porcentaje indica cuánta documentación de la empresa está cargada en su dataroom de UNANCHA. ' +
            'No es una auditoría ni una certificación de su contenido.',
   });
 });
 
 // ══ Glosario (PLAN C3) ═════════════════════════════════════════════════════════
-// Una sola fuente para la Academia de EYWA y para EYWA Agro.
+// Una sola fuente para la Academia de UNANCHA y para UNANCHA Agro.
 publicApiRouter.get('/glosario', (c) => {
   cacheable(c);
   return c.json({ version: GLOSARIO_VERSION, estado: GLOSARIO_ESTADO, terminos: GLOSARIO });

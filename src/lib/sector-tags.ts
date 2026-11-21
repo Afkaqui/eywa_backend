@@ -1,4 +1,4 @@
-// Taxonomía TEMÁTICA de EYWA para etiquetar fondos (2026-07-18).
+// Taxonomía TEMÁTICA de UNANCHA para etiquetar fondos (2026-07-18).
 //
 // Por qué existe: los sectores de los fondos venían como texto libre del Excel de
 // Neo ("Medio ambiente, salud.", "IA, Gobierno Digital.") y los de las empresas son

@@ -1,4 +1,4 @@
-// ══ EYWA Agro — service worker (app de campo sin internet) ═════════════════════
+// ══ UNANCHA Agro — service worker (app de campo sin internet) ═════════════════════
 //
 // Qué hace:
 //  · Guarda la app (HTML, logo y librerías) para que abra sin señal.
@@ -10,7 +10,7 @@
 //  · Al cerrar sesión la página pide borrar la copia de datos ('limpiar').
 //
 // Subir VERSION cuando cambie la lista de archivos de la app.
-const VERSION = 'agro-v2';
+const VERSION = 'agro-v3';
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_API = 'agro-api';
 

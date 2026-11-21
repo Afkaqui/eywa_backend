@@ -11,7 +11,7 @@ const academyRepo = new AcademyRepository(db);
 // ── GET /api/certificates/verify/:code  (PÚBLICO) ─────────────────────────────
 // Verificación de autenticidad de un certificado por su código.
 // Registrado ANTES del authMiddleware a propósito: cualquier tercero
-// (empleador, inversor) puede validar un certificado EYWA.
+// (empleador, inversor) puede validar un certificado UNANCHA.
 certificatesRouter.get('/verify/:code', async (c) => {
   const { code } = c.req.param();
   const cert = await academyRepo.getCertificateByCode(code.toUpperCase());

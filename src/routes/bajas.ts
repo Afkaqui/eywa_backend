@@ -59,14 +59,14 @@ bajasRouter.post('/', async (c) => {
     if (perfil) {
       await sendMail({
         to: perfil.email,
-        subject: 'Recibimos tu solicitud de baja de EYWA',
+        subject: 'Recibimos tu solicitud de baja de UNANCHA',
         html: baseTemplate({
           title: 'Recibimos tu solicitud de baja',
           bodyHtml: `<p>Hola${perfil.fullName ? ' ' + esc(perfil.fullName) : ''}:</p>
-            <p>Recibimos una solicitud para eliminar tu cuenta de EYWA. La revisaremos y te escribiremos cuando se complete.</p>
+            <p>Recibimos una solicitud para eliminar tu cuenta de UNANCHA. La revisaremos y te escribiremos cuando se complete.</p>
             <p><strong>¿No la pediste tú?</strong> Responde a este correo y no eliminaremos nada.</p>`,
         }),
-        text: 'Recibimos una solicitud para eliminar tu cuenta de EYWA. La revisaremos y te escribiremos cuando se complete. Si no la pediste tú, responde a este correo y no eliminaremos nada.',
+        text: 'Recibimos una solicitud para eliminar tu cuenta de UNANCHA. La revisaremos y te escribiremos cuando se complete. Si no la pediste tú, responde a este correo y no eliminaremos nada.',
       }).catch(() => {});
     }
   }
@@ -160,14 +160,14 @@ bajasRouter.post('/:id/eliminar', async (c) => {
 
   const correo = await sendMail({
     to: p.email,
-    subject: 'Tu cuenta de EYWA fue eliminada',
+    subject: 'Tu cuenta de UNANCHA fue eliminada',
     html: baseTemplate({
       title: 'Tu cuenta fue eliminada',
       bodyHtml: `<p>Hola${p.fullName ? ' ' + esc(p.fullName) : ''}:</p>
-        <p>Atendimos tu solicitud: eliminamos tu cuenta de EYWA con sus organizaciones, documentos y diagnósticos.</p>
+        <p>Atendimos tu solicitud: eliminamos tu cuenta de UNANCHA con sus organizaciones, documentos y diagnósticos.</p>
         <p>Si quieres volver, puedes crear una cuenta nueva cuando lo desees.</p>`,
     }),
-    text: 'Atendimos tu solicitud: eliminamos tu cuenta de EYWA con sus organizaciones, documentos y diagnósticos.',
+    text: 'Atendimos tu solicitud: eliminamos tu cuenta de UNANCHA con sus organizaciones, documentos y diagnósticos.',
   });
   return c.json({ ok: true, correo_enviado: correo.ok });
 });
@@ -191,15 +191,15 @@ bajasRouter.post('/:id/rechazar', async (c) => {
     if (p) {
       correo = (await sendMail({
         to: p.email,
-        subject: 'Sobre tu solicitud de baja de EYWA',
+        subject: 'Sobre tu solicitud de baja de UNANCHA',
         html: baseTemplate({
           title: 'No eliminamos tu cuenta',
           bodyHtml: `<p>Revisamos la solicitud de baja de tu cuenta y no la eliminamos por este motivo:</p>
             <blockquote style="border-left:3px solid #d1d5db;margin:0;padding-left:12px;color:#374151;">${esc(parsed.data.nota)}</blockquote>
             <p>Si tienes dudas, responde a este correo.</p>`,
-          ctaLabel: 'Ir a EYWA', ctaUrl: appUrl('/'),
+          ctaLabel: 'Ir a UNANCHA', ctaUrl: appUrl('/'),
         }),
-        text: `No eliminamos tu cuenta de EYWA por este motivo: ${parsed.data.nota}`,
+        text: `No eliminamos tu cuenta de UNANCHA por este motivo: ${parsed.data.nota}`,
       })).ok;
     }
   }

@@ -6,7 +6,7 @@
  *
  *  · `consentimiento_datos` debe ser exactamente `true`; el servidor rechaza `false`.
  *  · Los campos opcionales NO admiten `null`: hay que OMITIR la clave. Enviar
- *    `"telefono": null` da 422. En EYWA el teléfono y el RUC vienen vacíos a
+ *    `"telefono": null` da 422. En UNANCHA el teléfono y el RUC vienen vacíos a
  *    menudo, así que podar los nulos no es cosmética: sin ello no entra nada.
  *  · La respuesta trae un `mavii_lite` con score, semáforo y decisión sugerida.
  */
@@ -90,7 +90,7 @@ export function construirPayload(d: DatosEnvio) {
       ? {
           finanzas: podar({
             presupuesto_estimado: d.finanzas.presupuesto,
-            // EYWA trata el presupuesto en USD; si no se dice, MAVI asumiría otra cosa.
+            // UNANCHA trata el presupuesto en USD; si no se dice, MAVI asumiría otra cosa.
             moneda:               d.finanzas.moneda ?? 'USD',
             fuentes_previstas:    d.finanzas.fuentes,
           }),

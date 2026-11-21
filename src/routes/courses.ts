@@ -22,7 +22,7 @@ coursesRouter.use('*', authMiddleware);
 //
 // Hasta ahora los recursos eran enlaces externos (Drive), que daban 401 a quien
 // no tuviera permiso en la carpeta ajena. Sirviéndolos desde aquí el acceso lo
-// decide EYWA: authMiddleware ya exige sesión para llegar a esta ruta.
+// decide UNANCHA: authMiddleware ya exige sesión para llegar a esta ruta.
 const NOMBRE_SEGURO = /^[A-Za-z0-9._-]+$/;
 
 coursesRouter.get('/material/:archivo', async (c) => {
@@ -423,7 +423,7 @@ coursesRouter.post('/', async (c) => {
     level:         parsed.data.level,
     durationHours: parsed.data.duration_hours,
     imageUrl:      parsed.data.image_url ?? null,
-    instructor:    parsed.data.instructor ?? 'EYWA Academy',
+    instructor:    parsed.data.instructor ?? 'Academia UNANCHA',
     lessonsCount:  parsed.data.lessons_count ?? 1,
     isPublished:   parsed.data.is_published ?? false,
     createdBy:     user.sub,

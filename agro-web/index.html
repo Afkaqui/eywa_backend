@@ -3,40 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EYWA Agro · Trazabilidad de cacao del lote al saco</title>
+<title>UNANCHA Agro · Trazabilidad de cacao del lote al saco</title>
 <meta name="description" content="Lotes georreferenciados, centro de acopio digital y un pasaporte con QR para cada saco: de dónde viene, cuándo se vendió y cuánto recibió el productor.">
 <link rel="canonical" href="https://agro.encsust4in4ble.earth/">
-<meta name="theme-color" content="#065f46">
+<meta name="theme-color" content="#2B1A10">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="EYWA Agro">
+<meta property="og:site_name" content="UNANCHA Agro">
 <meta property="og:locale" content="es_PE">
 <meta property="og:url" content="https://agro.encsust4in4ble.earth/">
-<meta property="og:title" content="EYWA Agro · Trazabilidad de cacao del lote al saco">
+<meta property="og:title" content="UNANCHA Agro · Trazabilidad de cacao del lote al saco">
 <meta property="og:description" content="Lotes georreferenciados, centro de acopio digital y un pasaporte con QR para cada saco: de dónde viene, cuándo se vendió y cuánto recibió el productor.">
 <meta property="og:image" content="https://agro.encsust4in4ble.earth/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="EYWA Agro: del lote al saco, trazable y justo">
+<meta property="og:image:alt" content="UNANCHA Agro: del lote al saco, trazable y justo">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="EYWA Agro · Trazabilidad de cacao del lote al saco">
+<meta name="twitter:title" content="UNANCHA Agro · Trazabilidad de cacao del lote al saco">
 <meta name="twitter:description" content="Lotes georreferenciados, centro de acopio digital y pasaporte con QR para cada saco.">
 <meta name="twitter:image" content="https://agro.encsust4in4ble.earth/og.png">
 <link rel="icon" href="/logo.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Identidad UNANCHA (Dossier_UNANCHA_001 §1.5): cacao para la marca y los textos,
+  // bosque para lo verificado y la acción principal. Se reasignan las escalas verdes.
+  (function () {
+    var bosque = { 50:'#EEF7F1', 100:'#DCEFE3', 200:'#B8E0C8', 300:'#86C9A3', 400:'#4FAA7A', 500:'#2A8F5C', 600:'#1E7A4C', 700:'#18643E', 800:'#134F31', 900:'#0E3B25', 950:'#082516' };
+    tailwind.config = { theme: { extend: {
+      colors: { emerald: bosque, green: bosque, cacao: '#2B1A10', bosque: '#1E7A4C', brote: '#DCEFE3', neutro: '#F7F7F5',
+                gray: { 50:'#F7F7F5', 800:'#3D2A1E', 900:'#2B1A10' } },
+      fontFamily: { sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'], marca: ['Archivo', '"IBM Plex Sans"', 'sans-serif'] },
+    } } };
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
-  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f9fafb; }
+  body { font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #F7F7F5; }
+  h1, h2, .font-marca { font-family: Archivo, "IBM Plex Sans", system-ui, sans-serif; }
   .inp { width: 100%; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .55rem .75rem; font-size: 16px; background: #fff; } /* 16px: evita el zoom automático de iOS */
-  .inp:focus { outline: 2px solid #10b981; outline-offset: 0; }
+  .inp:focus { outline: 2px solid #2A8F5C; outline-offset: 0; }
   @media (min-width: 768px) { .inp { font-size: .875rem; } }
   /* Identidad v2: botones en píldora verde Agro, tarjetas suaves */
-  .btn { background: #166534; color: #fff; border-radius: 9999px; padding: .6rem 1.2rem; font-size: .875rem; font-weight: 600; min-height: 40px; transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }
-  .btn:hover { background: #14532d; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(22,101,52,.22); } .btn:disabled { opacity: .5; transform: none; box-shadow: none; }
+  .btn { background: #1E7A4C; color: #fff; border-radius: 9999px; padding: .6rem 1.2rem; font-size: .875rem; font-weight: 600; min-height: 40px; transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }
+  .btn:hover { background: #18643E; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(30,122,76,.22); } .btn:disabled { opacity: .5; transform: none; box-shadow: none; }
   .btn2 { border: 1px solid #e5e7eb; border-radius: 9999px; padding: .45rem .9rem; font-size: .8rem; font-weight: 500; color: #374151; background: #fff; min-height: 36px; transition: background-color .2s, border-color .2s; }
-  .btn2:hover { background: #f0fdf4; border-color: #bbf7d0; }
+  .btn2:hover { background: #EEF7F1; border-color: #B8E0C8; }
   .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1.25rem; transition: box-shadow .3s ease, border-color .3s ease; }
   .card:hover { box-shadow: 0 12px 30px rgba(17,24,39,.06); }
   .inp { border-radius: .75rem !important; }
@@ -59,7 +75,7 @@
     .rt td.acc { justify-content: flex-end; flex-wrap: wrap; } .rt td.acc::before { content: none; }
     .rt-wrap { border: 0 !important; padding: 0 !important; background: transparent !important; }
   }
-  /* Identidad v2: movimiento (mismo sistema que la landing de EYWA) */
+  /* Identidad v2: movimiento (mismo sistema que la landing de UNANCHA) */
   @keyframes ey-blur-in { from { opacity: 0; filter: blur(10px); transform: translateY(10px); } to { opacity: 1; filter: blur(0); transform: none; } }
   @keyframes ey-fade-up { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
   @keyframes ey-pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
@@ -87,23 +103,23 @@
       .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: ey-fade linear both; animation-timeline: view(); animation-range: entry 0% entry 50%; }
     }
   }
-  /* Componentes animados (mismos que la landing de EYWA, en verde Agro) */
+  /* Componentes animados (mismos que la landing de UNANCHA, en verde Agro) */
   @property --fx-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
   @keyframes fx-spin { to { --fx-angle: 360deg; } }
   @keyframes fx-shine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
   @keyframes fx-ping { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); } 100% { box-shadow: 0 0 0 16px rgba(34,197,94,0); } }
   .fx-badge { background: linear-gradient(rgba(5,46,22,.55), rgba(5,46,22,.55)) padding-box, conic-gradient(from var(--fx-angle), #86efac, #22c55e, #fde68a, #22c55e, #86efac) border-box; border: 1.5px solid transparent; animation: fx-spin 5s linear infinite; }
-  .fx-shine { background: linear-gradient(110deg, #bbf7d0 40%, #ffffff 50%, #bbf7d0 60%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fx-shine 3.2s linear infinite; }
+  .fx-shine { background: linear-gradient(110deg, #B8E0C8 40%, #ffffff 50%, #B8E0C8 60%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fx-shine 3.2s linear infinite; }
   .fx-tl { position: relative; }
   .fx-tl-line { position: absolute; top: 0; bottom: 0; left: 23px; width: 3px; background: #e5e7eb; border-radius: 3px; }
   @media (min-width: 768px) { .fx-tl-line { left: 50%; transform: translateX(-50%); } }
-  .fx-tl-line > i { display: block; width: 100%; height: calc(var(--p, 0) * 100%); background: linear-gradient(#86efac, #166534); border-radius: 3px; transition: height .15s linear; }
+  .fx-tl-line > i { display: block; width: 100%; height: calc(var(--p, 0) * 100%); background: linear-gradient(#86efac, #1E7A4C); border-radius: 3px; transition: height .15s linear; }
   .fx-tl-item { opacity: .3; transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); transform: translateX(28px); }
   @media (min-width: 768px) { .fx-tl-item.izq { transform: translateX(-36px); } .fx-tl-item.der { transform: translateX(36px); } }
   .fx-tl-item.is-in { opacity: 1; transform: none; }
   .fx-tl-num { transition: background-color .4s, color .4s, border-color .4s; }
   .fx-tl-item.is-in .fx-tl-num { background: #22c55e; border-color: #22c55e; color: #fff; animation: fx-ping 1s ease-out 1; }
-  .fx-tl-item.is-in .fx-tl-card { border-color: #bbf7d0; box-shadow: 0 14px 34px rgba(22,101,52,.10); }
+  .fx-tl-item.is-in .fx-tl-card { border-color: #B8E0C8; box-shadow: 0 14px 34px rgba(30,122,76,.10); }
   @keyframes fx-orbit { to { transform: rotate(360deg); } }
   @keyframes fx-twinkle { 0%, 100% { opacity: .95; transform: scale(1); } 50% { opacity: .35; transform: scale(.6); } }
   @keyframes fx-orbits-in { from { opacity: 0; transform: scale(.7) rotate(-40deg); } to { opacity: 1; transform: none; } }
@@ -112,7 +128,7 @@
   .fx-dot { animation: fx-twinkle 4s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) {
     .fx-orbit { animation-duration: 240s !important; } .fx-dot { animation: none; }
-    .fx-badge { animation-duration: 12s; } .fx-shine { animation: none; color: #bbf7d0; background: none; }
+    .fx-badge { animation-duration: 12s; } .fx-shine { animation: none; color: #B8E0C8; background: none; }
     .fx-tl-item, .fx-tl-item.izq, .fx-tl-item.der { transform: none; }
   }
   dialog::backdrop { background: rgba(17,24,39,.45); }
@@ -123,10 +139,10 @@
 <header id="cab" class="bg-white border-b border-gray-200 sticky top-0 z-30">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
     <a href="/" data-ir class="flex items-center gap-2 min-w-0">
-      <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain shrink-0">
-      <span class="leading-tight hidden sm:block"><span class="block font-extrabold tracking-wide">EYWA <span class="text-emerald-600">AGRO</span></span>
+      <img src="/logo.png" alt="UNANCHA" class="w-9 h-9 object-contain shrink-0">
+      <span class="leading-tight hidden sm:block"><span class="block font-marca font-extrabold tracking-wide">UNANCHA <span class="text-emerald-600">AGRO</span></span>
       <span class="block text-[10px] font-semibold tracking-widest text-emerald-600">ORQUESTACIÓN DE ECOSISTEMAS</span></span>
-      <span class="font-extrabold hidden min-[400px]:inline sm:hidden whitespace-nowrap text-[15px]">EYWA <span class="text-emerald-600">AGRO</span></span>
+      <span class="font-marca font-extrabold hidden min-[400px]:inline sm:hidden whitespace-nowrap text-[15px]">UNANCHA <span class="text-emerald-600">AGRO</span></span>
     </a>
     <div id="orgsel" class="ml-auto min-w-0"></div>
     <button id="hamb" class="lg:hidden btn2 shrink-0" aria-label="Menú" aria-expanded="false">☰</button>
@@ -138,8 +154,8 @@
 <dialog id="dlg"></dialog>
 
 <script>
-// ══ EYWA Agro — trazabilidad por organización ═══════════════════════════════════
-// Misma cuenta y API que EYWA. Todo dato pertenece a una ORGANIZACIÓN (cooperativa,
+// ══ UNANCHA Agro — trazabilidad por organización ═══════════════════════════════════
+// Misma cuenta y API que UNANCHA. Todo dato pertenece a una ORGANIZACIÓN (cooperativa,
 // asociación, agroindustria); la activa viaja en la cabecera X-Agro-Org.
 // Roles: admin (todo, incl. ventas/pagos y equipo) · tecnico (registra) · lector.
 // Los textos del servidor se insertan siempre escapados.
@@ -147,13 +163,13 @@ const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n, d = 0) => (n == null ? '—' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: d }));
 const hoy = () => new Date().toISOString().slice(0, 10);
-const EYWA = 'https://eywa.encsust4in4ble.earth';
+const URL_PLATAFORMA = 'https://eywa.encsust4in4ble.earth';
 // La sesión se comparte entre pestañas (localStorage). Antes era por pestaña
 // (sessionStorage) y había que volver a entrar en cada pestaña nueva.
 const leer = (k) => { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch { return null; } };
 const guardar = (k, v) => { try { sessionStorage.removeItem(k); v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
-// Entrada única: EYWA emite un código de un solo uso y vuelve aquí (/sso#c=…).
-const ENTRAR_CON_EYWA = EYWA + '/ir-a-agro';
+// Entrada única: UNANCHA emite un código de un solo uso y vuelve aquí (/sso#c=…).
+const ENTRAR_CON_EYWA = URL_PLATAFORMA + '/ir-a-agro';
 // Si se cierra sesión en otra pestaña, esta también sale.
 window.addEventListener('storage', (e) => { if (e.key === 'agro_token' && !e.newValue && token) { token = null; org = null; orgs = []; render(); } });
 let token = leer('agro_token');
@@ -317,7 +333,7 @@ function modal(titulo, campos, alEnviar) {
   d.showModal();
 }
 
-let eywaDisponibles = []; // organizaciones de EYWA de la persona que aún no están en Agro
+let eywaDisponibles = []; // organizaciones de UNANCHA de la persona que aún no están en Agro
 async function cargarOrgs() {
   const r = await api('/agro/organizaciones');
   orgs = r.organizaciones;
@@ -367,7 +383,7 @@ function palabras(t, desde, cls = '') {
 }
 // Órbitas de puntos que giran en sentidos opuestos (hero "vivo"), en verdes y ámbar.
 function orbitas(size, rings) {
-  const col = ['#86efac', '#22c55e', '#bbf7d0', '#fbbf24', '#4ade80', '#dcfce7', '#16a34a'];
+  const col = ['#86efac', '#22c55e', '#B8E0C8', '#fbbf24', '#4ade80', '#dcfce7', '#16a34a'];
   let h = `<div aria-hidden="true" class="fx-orbits pointer-events-none absolute" style="width:${size}px;height:${size}px">`;
   for (let k = 0; k < rings; k++) {
     const r = size / 2 - k * (size / (rings * 2.6)), n = Math.round((2 * Math.PI * r) / 26);
@@ -402,8 +418,8 @@ function landing(app) {
     <nav class="sticky top-0 z-40 bg-white/95 border-b border-gray-100 backdrop-blur">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <a href="/" data-ir class="flex items-center gap-2.5">
-          <img src="/logo.png" alt="EYWA" class="w-9 h-9 object-contain">
-          <span class="leading-tight"><span class="block font-bold text-lg tracking-wide">EYWA <span class="text-green-700">AGRO</span></span>
+          <img src="/logo.png" alt="UNANCHA" class="w-9 h-9 object-contain">
+          <span class="leading-tight"><span class="block font-marca font-extrabold text-lg tracking-wide">UNANCHA <span class="text-green-700">AGRO</span></span>
           <span class="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-emerald-700">Del lote al saco</span></span>
         </a>
         <div class="hidden lg:flex items-center gap-1 text-sm text-gray-600">
@@ -411,7 +427,7 @@ function landing(app) {
           <a href="#como" class="px-3 py-2 hover:text-gray-900">Cómo funciona</a>
           <a href="#pasaporte" class="px-3 py-2 hover:text-gray-900">Pasaporte</a>
           <a href="#eudr" class="px-3 py-2 hover:text-gray-900">EUDR</a>
-          <a href="${EYWA}" class="px-3 py-2 hover:text-gray-900">← EYWA</a>
+          <a href="${URL_PLATAFORMA}" class="px-3 py-2 hover:text-gray-900">← UNANCHA</a>
         </div>
         <div class="flex items-center gap-2">
           <a href="/entrar" data-ir class="hidden sm:block px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Iniciar sesión</a>
@@ -488,7 +504,7 @@ function landing(app) {
       </div>
     </section>
 
-    <section style="background-color:#166534;background-image:radial-gradient(rgba(255,255,255,.10) 1.5px,transparent 1.5px);background-size:26px 26px">
+    <section style="background-color:#1E7A4C;background-image:radial-gradient(rgba(255,255,255,.10) 1.5px,transparent 1.5px);background-size:26px 26px">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center gap-9 text-center">
         <h2 class="ey-reveal-blur text-2xl md:text-3xl font-medium text-white">Meta del piloto en Megantoni, La Convención</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6 w-full">
@@ -500,7 +516,7 @@ function landing(app) {
     <section id="como" class="max-w-5xl mx-auto px-4 sm:px-6 py-24 flex flex-col gap-14">
       <div class="text-center flex flex-col gap-2">
         <h2 class="ey-reveal-blur text-4xl text-green-800">¿Cómo funciona?</h2>
-        <p class="text-gray-600">Así trabaja tu cooperativa con EYWA Agro en <b>4 pasos</b></p>
+        <p class="text-gray-600">Así trabaja tu cooperativa con UNANCHA Agro en <b>4 pasos</b></p>
       </div>
       <ol class="fx-tl flex flex-col gap-10" id="pasosTl">
         <span class="fx-tl-line" aria-hidden="true"><i></i></span>
@@ -532,17 +548,17 @@ function landing(app) {
     <section class="bg-green-50">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 py-24 flex flex-col items-center gap-5 text-center">
         <h2 class="ey-reveal-blur text-3xl md:text-4xl text-green-800">Lleva tu cooperativa <b>del lote al saco</b></h2>
-        <p class="text-gray-600">Crea tu organización con tu cuenta de EYWA y empieza a registrar a tus productores hoy.</p>
+        <p class="text-gray-600">Crea tu organización con tu cuenta de UNANCHA y empieza a registrar a tus productores hoy.</p>
         <div class="flex flex-col sm:flex-row gap-3">
           <a href="/entrar" data-ir class="ey-pill bg-green-800 text-white">Empezar ahora</a>
-          <a href="${EYWA}" class="ey-pill border border-green-300 bg-white text-green-800 font-medium">Crear cuenta en EYWA</a>
+          <a href="${URL_PLATAFORMA}" class="ey-pill border border-green-300 bg-white text-green-800 font-medium">Crear cuenta en UNANCHA</a>
         </div>
       </div>
     </section>
 
     <footer class="bg-gray-950 text-gray-400">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-        <div class="flex flex-wrap items-center justify-center gap-3"><img src="/logo.png" alt="EYWA" class="w-8 h-8 rounded-lg bg-white object-contain"><span class="font-semibold text-white">EYWA Agro</span><span>· Del lote al saco, trazable y justo</span></div>
+        <div class="flex flex-wrap items-center justify-center gap-3"><img src="/logo.png" alt="UNANCHA" class="w-8 h-8 rounded-lg bg-white object-contain"><span class="font-semibold text-white">UNANCHA Agro</span><span>· Del lote al saco, trazable y justo</span></div>
         <span class="text-xs">Proyecto financiado por ProInnóvate · DER Cusco</span>
       </div>
     </footer>
@@ -579,7 +595,7 @@ function animarLanding(app) {
   medir();
 }
 
-// ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
+// ── Login: el mismo de UNANCHA (misma cuenta, mismo diseño) ──
 const GUARDADO_SIN_RED = 'Sin conexión: quedó guardado en este teléfono y se enviará solo al volver la señal.';
 
 // ── Registros guardados sin conexión ──
@@ -606,7 +622,7 @@ function pendientesVista(app) {
   const e = $('#enviarTodo'); if (e) e.onclick = async () => { await sincronizar(true); pendientesVista(app); };
 }
 
-// ── Entrada única desde EYWA ──
+// ── Entrada única desde UNANCHA ──
 // Llega con #c=<código>&a=<ruta>. El código se canjea UNA vez por el token y se
 // borra de la barra de direcciones de inmediato.
 async function entradaUnica(app) {
@@ -615,7 +631,7 @@ async function entradaUnica(app) {
   const destino = /^\/(?!\/)[\w\-/]*$/.test(h.get('a') || '') ? h.get('a') : '/';
   history.replaceState({}, '', '/sso');
   $('#cab').style.display = 'none';
-  app.innerHTML = '<div class="min-h-[60vh] flex items-center justify-center gap-2 text-sm text-gray-500"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Entrando con tu cuenta de EYWA…</div>';
+  app.innerHTML = '<div class="min-h-[60vh] flex items-center justify-center gap-2 text-sm text-gray-500"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Entrando con tu cuenta de UNANCHA…</div>';
   if (!codigo) { history.replaceState({}, '', '/entrar?sso=error'); return render(); }
   try {
     const d = await api('/auth/sso/canjear', { method: 'POST', body: { codigo } });
@@ -633,27 +649,27 @@ function login(app) {
   <div class="min-h-screen flex">
     <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 bg-white">
       <div class="w-full max-w-md">
-        <a href="/" data-ir class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Volver a EYWA Agro</a>
+        <a href="/" data-ir class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-8">← Volver a UNANCHA Agro</a>
         <div class="flex items-center gap-3 mb-10">
-          <img src="/logo.png" alt="EYWA" class="w-12 h-12 object-contain">
-          <div><div class="text-gray-900 font-bold text-2xl tracking-tight">EYWA <span class="text-emerald-600">AGRO</span></div>
+          <img src="/logo.png" alt="UNANCHA" class="w-12 h-12 object-contain">
+          <div><div class="font-marca text-gray-900 font-extrabold text-2xl tracking-tight">UNANCHA <span class="text-emerald-600">AGRO</span></div>
           <div class="text-emerald-600 text-xs tracking-wider">ORQUESTACIÓN DE ECOSISTEMAS</div></div>
         </div>
         <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 mb-3">Bienvenido</h1>
-        <p class="text-gray-600 mb-6">Tu cuenta de EYWA es la misma. Si ya entraste en EYWA, no necesitas tu contraseña.</p>
-        <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde EYWA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
+        <p class="text-gray-600 mb-6">Tu cuenta de UNANCHA es la misma. Si ya entraste en UNANCHA, no necesitas tu contraseña.</p>
+        <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde UNANCHA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
         <a href="${ENTRAR_CON_EYWA}" class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 flex items-center justify-center gap-2 mb-6">
-          <img src="/logo.png" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de EYWA</a>
+          <img src="/logo.png" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de UNANCHA</a>
         <div class="flex items-center gap-3 text-xs text-gray-400 mb-6"><span class="flex-1 h-px bg-gray-200"></span>o con tu correo<span class="flex-1 h-px bg-gray-200"></span></div>
         <form id="f" class="space-y-5">
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</span>
             <input class="inp" name="email" type="email" placeholder="tu@empresa.com" required autocomplete="username"></label>
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Contraseña</span>
             <input class="inp" name="password" type="password" placeholder="••••••••" required autocomplete="current-password"></label>
-          <div class="text-right"><a href="${EYWA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
+          <div class="text-right"><a href="${URL_PLATAFORMA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
           <button class="ey-pill w-full bg-white border border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50" id="entrar">Iniciar sesión</button>
         </form>
-        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${EYWA}" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
+        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${URL_PLATAFORMA}" class="text-emerald-600 font-medium">Regístrate en UNANCHA</a></p>
       </div>
     </div>
     <div class="hidden lg:block lg:w-1/2 relative">
@@ -684,11 +700,11 @@ function nuevaOrganizacion(app) {
   app.innerHTML = `
   <div class="max-w-xl mx-auto">
     <h1 class="text-2xl font-semibold tracking-tight mb-2">${primera ? 'Crea tu organización' : 'Nueva organización'}</h1>
-    <p class="text-sm text-gray-500 mb-5">${primera ? 'Todo en EYWA Agro se registra dentro de una organización: tu cooperativa, asociación o empresa. Tú quedarás como administrador y podrás sumar a tus técnicos de campo.' : 'Quedarás como administrador.'}</p>
+    <p class="text-sm text-gray-500 mb-5">${primera ? 'Todo en UNANCHA Agro se registra dentro de una organización: tu cooperativa, asociación o empresa. Tú quedarás como administrador y podrás sumar a tus técnicos de campo.' : 'Quedarás como administrador.'}</p>
     <div id="msg"></div>
     ${eywaDisponibles.length ? `
     <div class="card mb-4 !border-green-200 !bg-green-50/60">
-      <p class="font-semibold text-gray-900">Tus organizaciones de EYWA</p>
+      <p class="font-semibold text-gray-900">Tus organizaciones de UNANCHA</p>
       <p class="text-sm text-gray-600 mb-3">Úsala aquí con un clic: es la misma empresa en ambas plataformas, con tu misma cuenta.</p>
       <div class="space-y-2">
         ${eywaDisponibles.map((o) => `<div class="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 p-3">
@@ -768,7 +784,7 @@ async function panel(app) {
     </div>
   </section>
   ${eywaDisponibles.length ? `<div class="card mb-5 flex flex-wrap items-center gap-3 !border-green-200 !bg-green-50/60 text-sm">
-    <span class="flex-1 min-w-[14rem]">Tienes ${eywaDisponibles.length === 1 ? `<b>${esc(eywaDisponibles[0].nombre)}</b>` : `<b>${eywaDisponibles.length} organizaciones</b>`} en EYWA que aún no usas en Agro.</span>
+    <span class="flex-1 min-w-[14rem]">Tienes ${eywaDisponibles.length === 1 ? `<b>${esc(eywaDisponibles[0].nombre)}</b>` : `<b>${eywaDisponibles.length} organizaciones</b>`} en UNANCHA que aún no usas en Agro.</span>
     <a data-ir href="/organizaciones" class="btn2">Usarla en Agro</a></div>` : ''}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
     ${kpi('Productores', num(r.productores))}
@@ -797,12 +813,12 @@ async function panel(app) {
     <p class="text-xs text-gray-400 mt-3">La "no deforestación" es una declaración del productor con fecha; aún no hay verificación satelital.</p>
   </div>
   <div class="card mt-4 text-sm">
-    <p class="font-medium text-gray-800 mb-2">Con tu misma cuenta, en EYWA</p>
+    <p class="font-medium text-gray-800 mb-2">Con tu misma cuenta, en UNANCHA</p>
     <div class="flex flex-wrap gap-2">
-      <a class="btn2" href="${EYWA}/?vista=diagnostico" target="_blank" rel="noopener">Diagnóstico GENES de tu organización</a>
-      <a class="btn2" href="${EYWA}/?vista=dataroom" target="_blank" rel="noopener">Dataroom</a>
-      <a class="btn2" href="${EYWA}/?vista=validador" target="_blank" rel="noopener">Validador de proyectos</a>
-      <a class="btn2" href="${EYWA}/?vista=academia" target="_blank" rel="noopener">Academia</a>
+      <a class="btn2" href="${URL_PLATAFORMA}/?vista=diagnostico" target="_blank" rel="noopener">Diagnóstico GENES de tu organización</a>
+      <a class="btn2" href="${URL_PLATAFORMA}/?vista=dataroom" target="_blank" rel="noopener">Dataroom</a>
+      <a class="btn2" href="${URL_PLATAFORMA}/?vista=validador" target="_blank" rel="noopener">Validador de proyectos</a>
+      <a class="btn2" href="${URL_PLATAFORMA}/?vista=academia" target="_blank" rel="noopener">Academia</a>
     </div>
   </div>`;
 }
@@ -956,10 +972,10 @@ async function equipo(app, msg = '') {
   <div class="grid lg:grid-cols-3 gap-4">
     ${puede.admin() ? `<form id="f" class="card space-y-3 h-fit">
       <div class="font-medium">Sumar a alguien</div>
-      <input class="inp" name="email" type="email" placeholder="Correo de su cuenta de EYWA" required>
+      <input class="inp" name="email" type="email" placeholder="Correo de su cuenta de UNANCHA" required>
       <select class="inp" name="rol">${opcionesRol('tecnico')}</select>
       <button class="btn w-full">Agregar</button>
-      <p class="text-[11px] text-gray-400">Necesita una cuenta de EYWA (es la misma para agro). Si no la tiene, que se registre en eywa.encsust4in4ble.earth.</p>
+      <p class="text-[11px] text-gray-400">Necesita una cuenta de UNANCHA (es la misma para agro). Si no la tiene, que se registre en eywa.encsust4in4ble.earth.</p>
     </form>` : ''}
     <div class="card rt-wrap ${puede.admin() ? 'lg:col-span-2' : 'lg:col-span-3'}">
       ${tabla(['Persona', 'Rol', ''], miembros.map((m) => [
@@ -1053,17 +1069,17 @@ function importar(app) {
   }
 }
 
-// ══ Módulos reciclados de EYWA (misma API, misma cuenta) ═══════════════════════
+// ══ Módulos reciclados de UNANCHA (misma API, misma cuenta) ═══════════════════════
 async function fondos(app) {
   const r = await fetch('/api/funds', { headers: { Authorization: 'Bearer ' + token } });
-  if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-semibold tracking-tight mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de EYWA.', 'ok'); return; }
+  if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-semibold tracking-tight mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de UNANCHA.', 'ok'); return; }
   const d = await r.json();
   const todos = d.funds || [];
   const agro = todos.filter((f) => (f.sector_tags || []).some((t) => ['agro', 'ambiente', 'clima', 'circular'].includes(t)));
   const vig = (f) => !f.deadline || new Date(f.deadline) > new Date();
   app.innerHTML = `
   <h1 class="text-2xl font-semibold tracking-tight mb-1">Fondos para agro</h1>
-  <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de EYWA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
+  <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de UNANCHA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
   <div class="card rt-wrap">${tabla(['Fondo', 'Instrumento', 'Monto', 'Cierre'], agro.sort((a, b) => vig(b) - vig(a)).map((f) => [
     `${f.url ? `<a class="text-emerald-700 underline" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}
       <div class="text-xs text-gray-400">${esc(f.scope)}${f.verify_status === 'enlace_roto' ? ' · enlace por verificar' : ''}</div>`,
@@ -1077,7 +1093,7 @@ async function actores(app) {
   const d = await api('/public/v1/actores?por_pagina=100&q=' + encodeURIComponent(q));
   app.innerHTML = `
   <h1 class="text-2xl font-semibold tracking-tight mb-1">Actores del ecosistema</h1>
-  <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de EYWA).</p>
+  <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de UNANCHA).</p>
   <form id="fq" class="mb-4 flex gap-2"><input class="inp" name="q" placeholder="Buscar: cacao, agro, café, cooperativa…" value="${esc(q)}"><button class="btn shrink-0">Buscar</button></form>
   <div class="grid md:grid-cols-2 gap-3">${d.actores.map((a) => `<div class="card !p-4">
     <div class="font-medium">${a.web ? `<a class="hover:text-emerald-700" href="${esc(a.web.startsWith('http') ? a.web : 'https://' + a.web)}" target="_blank" rel="noopener">${esc(a.nombre)}</a>` : esc(a.nombre)}</div>
@@ -1129,7 +1145,7 @@ async function pasaporte(app, cod) {
     ${l.sin_deforestacion.declarada ? `<p class="text-xs text-gray-400 mt-3">${esc(l.sin_deforestacion.nota)}</p>` : ''}
     ${d.cosechas && d.cosechas.length ? `<div class="mt-4 text-sm"><div class="font-medium mb-1">Cosechas recientes</div>${d.cosechas.map((c) => `<div class="text-gray-600">${esc(c.fecha)} · ${num(c.kilos)} kg</div>`).join('')}</div>` : ''}
   </div>`;
-  if (window.QRCode) new QRCode($('#qr'), { text: location.href, width: 96, height: 96, colorDark: '#065f46' });
+  if (window.QRCode) new QRCode($('#qr'), { text: location.href, width: 96, height: 96, colorDark: '#2B1A10' });
 }
 
 window.addEventListener('resize', () => { if (window.innerWidth >= 1024) $('#nav').classList.remove('hidden'); });

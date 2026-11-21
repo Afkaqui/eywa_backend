@@ -1,4 +1,4 @@
-// La escala oficial de EYWA es GENES (más abajo). Aquí vivía además una escala
+// La escala oficial de UNANCHA es GENES (más abajo). Aquí vivía además una escala
 // genérica (`getScoreLevel`: Excelente/Bueno/Moderado) que se contradecía con
 // ella. Se eliminó con el fix del Trust Score (2026-07-25).
 // **No reintroducir una segunda escala de calificación.**
@@ -73,7 +73,7 @@ export function computeGenesFromCategories(cat: {
 // empresa obtendría puntajes distintos según por dónde entre.
 //
 // La API no acepta un puntaje ya calculado: recibe la OPCIÓN elegida en cada
-// criterio y el puntaje lo pone EYWA. Así la metodología no depende de cómo la
+// criterio y el puntaje lo pone UNANCHA. Así la metodología no depende de cómo la
 // interprete cada sistema que nos alimente.
 export interface CriterioGenes {
   code: string | null;
@@ -109,12 +109,12 @@ export function calcularGenes(criterios: CriterioGenes[], opcionPorCodigo: Map<s
 }
 
 // ── Versión y naturaleza del resultado (PENDIENTES §9, reglas innegociables) ──
-// Un puntaje es un dictamen. Todo resultado que sale de EYWA hacia fuera lleva la
+// Un puntaje es un dictamen. Todo resultado que sale de UNANCHA hacia fuera lleva la
 // versión de la metodología con que se calculó y qué ES: una autoevaluación con
 // respuestas declaradas, no una calificación ni una certificación.
 // Subir la versión cuando cambien criterios, pesos, opciones o bandas.
 export const GENES_VERSION = '2026-07-25'; // última modificación: bandas Marrón…Fénix (Eduardo)
 
 export const GENES_AVISO =
-  'Puntaje preliminar calculado por EYWA con respuestas declaradas por quien las envió. ' +
+  'Puntaje preliminar calculado por UNANCHA con respuestas declaradas por quien las envió. ' +
   'No es una calificación crediticia ni una certificación.';
