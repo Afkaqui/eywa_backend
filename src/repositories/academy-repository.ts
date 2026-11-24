@@ -1,9 +1,9 @@
 import { randomBytes } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 
-// Genera un código de certificado tipo UNANCHA-3F9A2C1B (verificable públicamente)
+// Genera un código de certificado tipo EYWA-3F9A2C1B (verificable públicamente)
 function generateCertCode(): string {
-  return `UNANCHA-${randomBytes(4).toString('hex').toUpperCase()}`;
+  return `EYWA-${randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 export class AcademyRepository {

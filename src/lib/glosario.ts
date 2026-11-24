@@ -1,12 +1,12 @@
-// ══ Glosario UNANCHA (PLAN C3) ═════════════════════════════════════════════════════
+// ══ Glosario EYWA (PLAN C3) ═════════════════════════════════════════════════════
 //
 // Términos que se usan con clientes y en reuniones. Una sola fuente: la sirve la
-// API pública y la consumen la Academia de UNANCHA y UNANCHA Agro.
+// API pública y la consumen la Academia de EYWA y UNANCHA Agro.
 //
 // Revisión 2026-11-19: cada término se contrastó con una fuente oficial nacional
 // (CONCYTEC, MEF, MINAM) o internacional (ONU, CMNUCC, PNUMA, FAO, OCDE, UE, GHG
 // Protocol, ICMA, WFTO). Se quitaron las cifras sin respaldo. Los términos de la
-// categoría "Metodología UNANCHA" son propios y su fuente es UNANCHA. La taxonomía verde
+// categoría "Metodología EYWA" son propios y su fuente es EYWA. La taxonomía verde
 // oficial del Perú aún no se publica (comisión multisectorial del MEF con el MINAM);
 // cuando se apruebe se enlaza en su término.
 // Si una definición cambia, se cambia aquí y se actualiza en ambas plataformas.
@@ -19,31 +19,31 @@ export interface Fuente {
 export interface Termino {
   termino: string;
   sigla?: string;
-  categoria: 'Metodología UNANCHA' | 'Innovación' | 'Finanzas' | 'Sostenibilidad' | 'Agro';
+  categoria: 'Metodología EYWA' | 'Innovación' | 'Finanzas' | 'Sostenibilidad' | 'Agro';
   definicion: string;
   fuente: Fuente;
 }
 
 export const GLOSARIO_VERSION = '2026-11-19';
-export const GLOSARIO_ESTADO = 'Definiciones revisadas contra fuentes oficiales nacionales e internacionales (noviembre de 2026); cada término indica su fuente. Los términos de la Metodología UNANCHA son propios. La taxonomía verde oficial del Perú está en elaboración y se enlazará cuando se apruebe.';
+export const GLOSARIO_ESTADO = 'Definiciones revisadas contra fuentes oficiales nacionales e internacionales (noviembre de 2026); cada término indica su fuente. Los términos de la Metodología EYWA son propios. La taxonomía verde oficial del Perú está en elaboración y se enlazará cuando se apruebe.';
 
-const UNANCHA: Fuente = { nombre: 'Metodología UNANCHA' };
+const EYWA: Fuente = { nombre: 'Metodología EYWA' };
 const CONCYTEC: Fuente = { nombre: 'CONCYTEC · Niveles de madurez tecnológica y comercial', url: 'https://vinculate.concytec.gob.pe/niveles-de-madurez/' };
 
 export const GLOSARIO: Termino[] = [
-  // ── Metodología UNANCHA (conceptos propios) ──
-  { termino: 'Máximo Producto Posible', sigla: 'MPP', categoria: 'Metodología UNANCHA', fuente: UNANCHA,
+  // ── Metodología EYWA (conceptos propios) ──
+  { termino: 'Máximo Producto Posible', sigla: 'MPP', categoria: 'Metodología EYWA', fuente: EYWA,
     definicion: 'Todo lo que puede salir de un mismo insumo y a qué sectores se puede vender: por ejemplo, de la mazorca de cacao, el grano, la cáscara y el mucílago. Contrasta con el "producto mínimo viable": en lugar de lanzar lo mínimo, se dimensiona cuánto valor circular puede generar el negocio. Se relaciona con la bioeconomía y la economía circular.' },
-  { termino: 'Definición del problema', categoria: 'Metodología UNANCHA', fuente: UNANCHA,
+  { termino: 'Definición del problema', categoria: 'Metodología EYWA', fuente: EYWA,
     definicion: 'Antes de proponer una solución se define el problema real con seis elementos: actor afectado, dolor, causa raíz, urgencia, consecuencia si no se actúa y unidad de validación (quién lo quiere y pagaría). Un problema es una brecha que no desaparece del todo; el proyecto ataca una causa y lo mitiga.' },
-  { termino: 'Metodología GENES', sigla: 'GENES', categoria: 'Metodología UNANCHA', fuente: UNANCHA,
-    definicion: 'Diagnóstico de sostenibilidad de UNANCHA: 14 criterios ponderados en cuatro categorías (perfil, ambiental, social, económico), con un puntaje de 0 a 75 y cinco bandas: Marrón, Verde, Plata, Oro y Fénix. Es una autoevaluación, no una certificación.' },
-  { termino: 'Índice de Madurez Industrial', sigla: 'IMI', categoria: 'Metodología UNANCHA', fuente: UNANCHA,
-    definicion: 'Indicador en desarrollo en UNANCHA que ubica a una empresa entre las revoluciones industriales (de 1.0 a 5.0) según su maquinaria, energía y operación, como apoyo para sustentar el nivel de madurez tecnológica (TRL) de un proyecto. No es un estándar oficial.' },
+  { termino: 'Metodología GENES', sigla: 'GENES', categoria: 'Metodología EYWA', fuente: EYWA,
+    definicion: 'Diagnóstico de sostenibilidad de EYWA: 14 criterios ponderados en cuatro categorías (perfil, ambiental, social, económico), con un puntaje de 0 a 75 y cinco bandas: Marrón, Verde, Plata, Oro y Fénix. Es una autoevaluación, no una certificación.' },
+  { termino: 'Índice de Madurez Industrial', sigla: 'IMI', categoria: 'Metodología EYWA', fuente: EYWA,
+    definicion: 'Indicador en desarrollo en EYWA que ubica a una empresa entre las revoluciones industriales (de 1.0 a 5.0) según su maquinaria, energía y operación, como apoyo para sustentar el nivel de madurez tecnológica (TRL) de un proyecto. No es un estándar oficial.' },
 
   // ── Innovación ──
   { termino: 'Nivel de madurez tecnológica', sigla: 'TRL', categoria: 'Innovación', fuente: CONCYTEC,
-    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación. En UNANCHA se usa la escala del CONCYTEC (adaptada de la NASA y la Unión Europea; uso regulado por la R. P. 020-2022-CONCYTEC-P), que agrupa los niveles en investigación básica, investigación aplicada, desarrollo tecnológico e innovación. Su calculadora en Vincúlate da un resultado orientador y referencial.' },
+    definicion: 'Escala del 1 al 9 que indica cuán probada está una tecnología: de la idea en papel (1) al sistema funcionando en su entorno real (9). La piden casi todos los fondos de innovación. En EYWA se usa la escala del CONCYTEC (adaptada de la NASA y la Unión Europea; uso regulado por la R. P. 020-2022-CONCYTEC-P), que agrupa los niveles en investigación básica, investigación aplicada, desarrollo tecnológico e innovación. Su calculadora en Vincúlate da un resultado orientador y referencial.' },
   { termino: 'Nivel de madurez comercial', sigla: 'CRL', categoria: 'Innovación', fuente: CONCYTEC,
     definicion: 'Escala paralela al TRL pero del lado del mercado: de las hipótesis del modelo de negocio a un modelo validado y listo para escalar. Escala de 1 a 9. En la propuesta del CONCYTEC es un complemento opcional del TRL: se evalúa cuando el proyecto ya tiene un TRL elevado, es un emprendimiento tecnológico y cuenta con información de mercado.' },
   { termino: 'Quíntuple hélice', categoria: 'Innovación',
@@ -51,7 +51,7 @@ export const GLOSARIO: Termino[] = [
     definicion: 'Modelo que explica la innovación como la interacción de cinco subsistemas: academia, empresas, gobierno, sociedad civil (incluidos los medios y la cultura) y el medio ambiente. Añade el ambiente a la triple hélice (academia, empresa y Estado) para orientar la innovación hacia la sostenibilidad.' },
   { termino: 'Estrategia del océano azul', categoria: 'Innovación',
     fuente: { nombre: 'W. Chan Kim y Renée Mauborgne, La estrategia del océano azul (2005)' },
-    definicion: 'Océano rojo: un mercado existente donde se compite por la misma demanda. Océano azul: un espacio de mercado nuevo, sin competencia directa, que se crea innovando en valor. En UNANCHA se aplica también a los fondos: dos convocatorias del mismo monto, una con 1000 postulantes y otra con 32; conviene la segunda.' },
+    definicion: 'Océano rojo: un mercado existente donde se compite por la misma demanda. Océano azul: un espacio de mercado nuevo, sin competencia directa, que se crea innovando en valor. En EYWA se aplica también a los fondos: dos convocatorias del mismo monto, una con 1000 postulantes y otra con 32; conviene la segunda.' },
   { termino: 'Objetivos y resultados clave', sigla: 'OKR', categoria: 'Innovación',
     fuente: { nombre: 'Andrew Grove (Intel) y John Doerr, Mide lo que importa (2018)' },
     definicion: 'Método de gestión que fija pocos objetivos ambiciosos, cada uno con resultados clave medibles, normalmente por trimestre y con seguimiento frecuente para corregir a tiempo. Se diferencia del KPI, que es un indicador de desempeño que suele medir resultados ya ocurridos.' },
@@ -72,7 +72,7 @@ export const GLOSARIO: Termino[] = [
   { termino: 'Aporte de contrapartida', categoria: 'Finanzas',
     fuente: { nombre: 'Bases de los concursos de ProInnóvate y PROCIENCIA' },
     definicion: 'Parte del presupuesto del proyecto que debe poner el beneficiario. Puede ser monetaria o no monetaria (horas del equipo, equipos o infraestructura valorizados), según lo que permitan las bases de cada convocatoria; el porcentaje mínimo cambia de un fondo a otro.' },
-  { termino: 'Tarifa de éxito', categoria: 'Finanzas', fuente: UNANCHA,
+  { termino: 'Tarifa de éxito', categoria: 'Finanzas', fuente: EYWA,
     definicion: 'Pago a quien estructuró el proyecto, condicionado a que el financiamiento se obtenga. Antes de pactarla hay que revisar las bases del fondo: muchas no permiten pagarla con los recursos del proyecto.' },
   { termino: 'Seguro paramétrico', categoria: 'Finanzas',
     fuente: { nombre: 'Banco Mundial · Seguros paramétricos frente a riesgos de desastres' },
@@ -84,7 +84,7 @@ export const GLOSARIO: Termino[] = [
   // ── Sostenibilidad ──
   { termino: 'Brecha de infraestructura o de acceso a servicios', categoria: 'Sostenibilidad',
     fuente: { nombre: 'MEF · Invierte.pe, indicadores de brechas', url: 'https://www.mef.gob.pe/es/indicadores-de-brechas' },
-    definicion: 'Diferencia entre la oferta disponible de infraestructura o de acceso a un servicio público y la demanda que debería cubrirse, en un momento y un territorio dados. En el Perú se mide con indicadores oficiales por sector y orienta la inversión pública. En UNANCHA también se usa "brecha sectorial" para un problema que afecta a muchas personas en una región.' },
+    definicion: 'Diferencia entre la oferta disponible de infraestructura o de acceso a un servicio público y la demanda que debería cubrirse, en un momento y un territorio dados. En el Perú se mide con indicadores oficiales por sector y orienta la inversión pública. En EYWA también se usa "brecha sectorial" para un problema que afecta a muchas personas en una región.' },
   { termino: 'Objetivos de Desarrollo Sostenible', sigla: 'ODS', categoria: 'Sostenibilidad',
     fuente: { nombre: 'ONU · Agenda 2030 (resolución A/RES/70/1)', url: 'https://www.un.org/sustainabledevelopment/es/objetivos-de-desarrollo-sostenible/' },
     definicion: 'Los 17 objetivos y 169 metas de la Agenda 2030, adoptada por los Estados de la ONU en 2015, para erradicar la pobreza, proteger el planeta y asegurar la prosperidad hacia 2030.' },

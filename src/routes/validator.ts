@@ -190,7 +190,7 @@ validatorRouter.put('/revision/:id', async (c) => {
 });
 
 // ── PUT /api/validator/plans/:id/madurez ─────────────────────────────────────
-// TRL y CRL obtenidos en la calculadora del CONCYTEC (metodología oficial). UNANCHA
+// TRL y CRL obtenidos en la calculadora del CONCYTEC (metodología oficial). EYWA
 // solo los registra; el resultado es referencial, como lo indica el CONCYTEC.
 const nivel = z.number().int().min(1).max(9).nullable();
 const madurezSchema = z.object({
@@ -376,7 +376,7 @@ validatorRouter.delete('/plans/:id/documents/:docId', async (c) => {
 // ── DELETE /api/validator/plans/:id ──────────────────────────────────────────
 // ── MAVI / ARS LAB (§14) ─────────────────────────────────────────────────────
 //
-// MAVI es el modelo de evaluación de UNANCHA y no conserva los datos. La API exige
+// MAVI es el modelo de evaluación de EYWA y no conserva los datos. La API exige
 // `consentimiento_datos: true`: ese consentimiento es la aceptación de los
 // términos al crear la cuenta (una sola vez). La ruta /consentimiento queda por
 // compatibilidad, pero la plataforma ya no la usa.
@@ -414,7 +414,7 @@ validatorRouter.post('/plans/:id/mavi', async (c) => {
   });
   if (!plan) throw new ApiError(404, 'Proyecto no encontrado');
 
-  // MAVI es el modelo de evaluación de UNANCHA: el consentimiento es el que la persona
+  // MAVI es el modelo de evaluación de EYWA: el consentimiento es el que la persona
   // dio UNA vez al aceptar los términos al crear su cuenta (decisión 2026-11-19).
   // Ya no hay una casilla por proyecto; se registra la fecha del envío como
   // constancia y se informa a MAVI que el consentimiento existe.

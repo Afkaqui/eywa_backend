@@ -589,13 +589,13 @@ dataroomRouter.post('/invitations', async (c) => {
 
   const result = await sendMail({
     to:      email,
-    subject: `${org.name} te invitó a revisar su dataroom en UNANCHA`,
+    subject: `${org.name} te invitó a revisar su dataroom en EYWA`,
     html: baseTemplate({
       title: `${org.name} compartió su dataroom contigo`,
       bodyHtml: `
         <p style="margin:0 0 12px;">${saluda}</p>
         <p style="margin:0 0 12px;">
-          <strong>${org.name}</strong> te dio acceso a su dataroom en UNANCHA para que
+          <strong>${org.name}</strong> te dio acceso a su dataroom en EYWA para que
           revises su documentación. Podrás <strong>ver y descargar</strong> los
           documentos, pero no modificarlos.
         </p>
@@ -610,7 +610,7 @@ dataroomRouter.post('/invitations', async (c) => {
     text: [
       saluda,
       '',
-      `${org.name} te dio acceso a su dataroom en UNANCHA para que revises su documentación.`,
+      `${org.name} te dio acceso a su dataroom en EYWA para que revises su documentación.`,
       `Puedes ver y descargar los documentos, pero no modificarlos. El acceso vence en ${INVITE_TTL_DAYS} días.`,
       '',
       link,

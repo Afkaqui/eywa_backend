@@ -73,9 +73,9 @@ export async function sendMail(opts: {
   }
 }
 
-// ── Plantilla base con la marca UNANCHA ────────────────────────────────────────────
+// ── Plantilla base con la marca EYWA ────────────────────────────────────────────
 // Correo en HTML con estilos EN LÍNEA: los clientes de correo (Gmail, Outlook)
-// descartan <style> y cualquier CSS externo. Paleta UNANCHA (cacao y bosque) según IDENTIDAD.md.
+// descartan <style> y cualquier CSS externo. Paleta EYWA (cacao y bosque) según IDENTIDAD.md.
 export function baseTemplate(opts: {
   title: string;
   bodyHtml: string;
@@ -103,7 +103,7 @@ export function baseTemplate(opts: {
                     border-radius:16px;padding:32px;
                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
         <tr><td style="padding-bottom:8px;">
-          <span style="font-size:20px;font-weight:800;color:#2B1A10;letter-spacing:0.02em;">UNANCHA</span>
+          <span style="font-size:20px;font-weight:800;color:#2B1A10;letter-spacing:0.02em;">EYWA</span>
         </td></tr>
         <tr><td style="border-bottom:1px solid #e5e7eb;padding-bottom:20px;">
           <div style="font-size:13px;color:#6b7280;">Plataforma de sostenibilidad e impacto</div>

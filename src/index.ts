@@ -67,7 +67,7 @@ app.use('*', async (c, next) => {
 });
 
 // Health check
-app.get('/', (c) => c.json({ status: 'ok', service: 'UNANCHA API', version: '1.0.0' }));
+app.get('/', (c) => c.json({ status: 'ok', service: 'EYWA API', version: '1.0.0' }));
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // Rutas
@@ -108,7 +108,7 @@ app.onError((err, c) => {
 app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404));
 
 const port = Number(process.env.PORT ?? 4001);
-console.log(`🚀 UNANCHA API corriendo en http://localhost:${port}`);
+console.log(`🚀 EYWA API corriendo en http://localhost:${port}`);
 
 serve({ fetch: app.fetch, port });
 

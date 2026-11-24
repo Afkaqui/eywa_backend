@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 
 // ══ Vertical AGRO (agro.encsust4in4ble.earth) ═══════════════════════════════════
 //
-// Proyecto ProInnóvate aparte de UNANCHA; comparte backend, base y cuentas.
+// Proyecto ProInnóvate aparte de EYWA; comparte backend, base y cuentas.
 // Flujo: productor → lotes (geolocalizados, con declaración de no deforestación)
 // → cosechas → entregas en el centro de acopio digital (cada saco con código) →
 // venta con precio de referencia y % pactado → monto que recibe el productor.
@@ -134,7 +134,7 @@ agroRouter.get('/organizaciones', async (c) => {
     where: { profileId: u.sub }, orderBy: { createdAt: 'asc' },
     include: { organizacion: { include: { _count: { select: { productores: true, miembros: true } } } } },
   });
-  // Organizaciones de UNANCHA de esta persona que aún no tienen su par en Agro: se
+  // Organizaciones de EYWA de esta persona que aún no tienen su par en Agro: se
   // ofrecen para usarlas con un clic (antes Agro no las mostraba y había que
   // crear la misma empresa de nuevo).
   const eywa = await db.organization.findMany({
@@ -154,8 +154,8 @@ agroRouter.get('/organizaciones', async (c) => {
   });
 });
 
-// Usa una organización de UNANCHA en Agro: crea su par enlazado (quien la usa queda
-// como administrador). Solo el dueño de la organización de UNANCHA puede hacerlo.
+// Usa una organización de EYWA en Agro: crea su par enlazado (quien la usa queda
+// como administrador). Solo el dueño de la organización de EYWA puede hacerlo.
 const enlazarSchema = z.object({
   organization_id: z.string().uuid('Organización inválida'),
   tipo:   z.enum(['cooperativa', 'asociacion', 'agroindustria', 'comprador', 'otro']).default('cooperativa'),
@@ -166,7 +166,7 @@ agroRouter.post('/organizaciones/desde-eywa', async (c) => {
   const u = getRequestUser(c);
   const d = validar(enlazarSchema, await c.req.json().catch(() => ({})));
   const o = await db.organization.findFirst({ where: { id: d.organization_id, userId: u.sub }, include: { agro: true } });
-  if (!o) throw new ApiError(404, 'No encontramos esa organización en tu cuenta de UNANCHA');
+  if (!o) throw new ApiError(404, 'No encontramos esa organización en tu cuenta de EYWA');
   if (o.agro) throw new ApiError(409, 'Esa organización ya está en UNANCHA Agro');
   const a = await db.agroOrganizacion.create({ data: {
     nombre: o.tradeName?.trim() || o.name, ruc: o.ruc, tipo: d.tipo, cadena: d.cadena,
@@ -201,9 +201,9 @@ const miembroSchema = z.object({
 agroRouter.post('/miembros', async (c) => {
   const { orgId } = await contexto(c, ['admin']);
   const d = validar(miembroSchema, await c.req.json().catch(() => ({})));
-  // La persona necesita una cuenta de UNANCHA: es la misma para UNANCHA y agro.
+  // La persona necesita una cuenta de EYWA: es la misma para EYWA y agro.
   const p = await db.profile.findFirst({ where: { email: { equals: d.email, mode: 'insensitive' } }, select: { id: true } });
-  if (!p) throw new ApiError(404, 'No hay una cuenta de UNANCHA con ese correo. Pídele que se registre en eywa.encsust4in4ble.earth y vuelve a invitarla.');
+  if (!p) throw new ApiError(404, 'No hay una cuenta de EYWA con ese correo. Pídele que se registre en eywa.encsust4in4ble.earth y vuelve a invitarla.');
   const ya = await db.agroMiembro.findUnique({ where: { organizacionId_profileId: { organizacionId: orgId, profileId: p.id } } });
   if (ya) throw new ApiError(409, 'Esa persona ya es parte del equipo');
   await db.agroMiembro.create({ data: { organizacionId: orgId, profileId: p.id, rol: d.rol } });

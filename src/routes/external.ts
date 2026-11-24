@@ -17,9 +17,9 @@ import { FUND_TAGS, tagsForSector } from '@/lib/sector-tags';
 //
 // Dos sentidos:
 //   ENTRADA  · el cliente da de alta empresas y, si quiere, las respuestas del
-//              diagnóstico GENES. UNANCHA calcula el puntaje; nunca lo acepta hecho.
+//              diagnóstico GENES. EYWA calcula el puntaje; nunca lo acepta hecho.
 //   SALIDA   · el cliente consulta lo que dio de alta (con su resultado GENES) y
-//              el directorio de empresas que publicaron su perfil en UNANCHA.
+//              el directorio de empresas que publicaron su perfil en EYWA.
 //
 // Lo que NO sale por aquí: empresas de otros usuarios que no publicaron su
 // perfil, ni el puntaje GENES de ninguna empresa que el cliente no haya dado de
@@ -27,7 +27,7 @@ import { FUND_TAGS, tagsForSector } from '@/lib/sector-tags';
 // enseñar más que la propia plataforma.
 //
 // Las respuestas van en español y snake_case, como las de MAVI que ya consume
-// UNANCHA: quien integre las dos no tiene que cambiar de convención.
+// EYWA: quien integre las dos no tiene que cambiar de convención.
 
 export const externalRouter = new Hono();
 const dataroomRepo = new DataroomRepository(db);
@@ -121,7 +121,7 @@ function serOrganizacion(o: Organization) {
 }
 
 // ══ GET /criterios ═════════════════════════════════════════════════════════════
-// Qué evalúa UNANCHA: los 14 criterios GENES con su peso y sus opciones. Es lo que
+// Qué evalúa EYWA: los 14 criterios GENES con su peso y sus opciones. Es lo que
 // el cliente necesita para saber qué datos enviar y cómo mapearlos.
 externalRouter.get('/criterios', requiereScope('criterios:leer'), async (c) => {
   const preguntas = await criteriosGenes();
@@ -153,10 +153,10 @@ const texto = (max: number) => z.string().trim().max(max).nullish();
 
 const altaSchema = z.object({
   referencia_externa: z.string().trim().min(1, 'Obligatoria').max(100),
-  // La empresa autorizó compartir sus datos con UNANCHA. Igual que MAVI con nosotros:
+  // La empresa autorizó compartir sus datos con EYWA. Igual que MAVI con nosotros:
   // no se presume, se declara en cada envío y se registra cuándo.
   consentimiento_datos: z.literal(true, {
-    errorMap: () => ({ message: 'Debe ser true: confirma que la empresa autorizó compartir estos datos con UNANCHA' }),
+    errorMap: () => ({ message: 'Debe ser true: confirma que la empresa autorizó compartir estos datos con EYWA' }),
   }),
   organizacion: z.object({
     razon_social:     z.string().trim().min(1, 'Obligatoria').max(200),
@@ -246,7 +246,7 @@ externalRouter.post('/organizaciones', requiereScope('organizaciones:escribir'),
     if (conEseRuc && conEseRuc.id !== existente?.id) {
       throw new ApiError(409, conEseRuc.apiClientId === cliente.id
         ? `Ya enviaste ese RUC con otra referencia_externa ("${conEseRuc.externalRef}")`
-        : 'Ese RUC ya está registrado en UNANCHA por otra cuenta');
+        : 'Ese RUC ya está registrado en EYWA por otra cuenta');
     }
   }
 
@@ -416,7 +416,7 @@ externalRouter.get('/organizaciones/:referencia/fondos', requiereScope('organiza
 });
 
 // ══ GET /empresas ══════════════════════════════════════════════════════════════
-// Directorio de las empresas que PUBLICARON su perfil en UNANCHA (mini-landing
+// Directorio de las empresas que PUBLICARON su perfil en EYWA (mini-landing
 // activa). Solo lo que esa página ya muestra en público.
 externalRouter.get('/empresas', requiereScope('empresas:leer'), async (c) => {
   const { pagina, porPagina, skip } = paginacion(c);

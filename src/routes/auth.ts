@@ -276,7 +276,7 @@ authRouter.post('/forgot-password', async (c) => {
 
       const result = await sendMail({
         to:      user.email,
-        subject: 'Restablece tu contraseña de UNANCHA',
+        subject: 'Restablece tu contraseña de EYWA',
         html: baseTemplate({
           title: 'Restablece tu contraseña',
           bodyHtml: `
@@ -363,9 +363,9 @@ authRouter.post('/reset-password', async (c) => {
 });
 
 
-// ══ Entrada única UNANCHA → UNANCHA Agro ═══════════════════════════════════════════
-// Quien ya inició sesión en UNANCHA entra a Agro sin volver a escribir su clave.
-// UNANCHA pide un CÓDIGO de un solo uso (60 s) y redirige a Agro con él en el
+// ══ Entrada única EYWA → UNANCHA Agro ═══════════════════════════════════════════
+// Quien ya inició sesión en EYWA entra a Agro sin volver a escribir su clave.
+// EYWA pide un CÓDIGO de un solo uso (60 s) y redirige a Agro con él en el
 // fragmento (#c=…, que no viaja al servidor ni queda en los logs); Agro lo canjea
 // por su token. El token nunca va en la URL.
 // En memoria: hay un solo contenedor y un código vive 60 s; si el contenedor se
@@ -377,7 +377,7 @@ function limpiarCodigos() {
   for (const [k, v] of codigosSso) if (v.vence < ahora) codigosSso.delete(k);
 }
 
-// POST /api/auth/sso/codigo  (con sesión de UNANCHA)
+// POST /api/auth/sso/codigo  (con sesión de EYWA)
 authRouter.post('/sso/codigo', authMiddleware, async (c) => {
   const u = getRequestUser(c);
   limpiarCodigos();

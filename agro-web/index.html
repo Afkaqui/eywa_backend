@@ -75,7 +75,7 @@
     .rt td.acc { justify-content: flex-end; flex-wrap: wrap; } .rt td.acc::before { content: none; }
     .rt-wrap { border: 0 !important; padding: 0 !important; background: transparent !important; }
   }
-  /* Identidad v2: movimiento (mismo sistema que la landing de UNANCHA) */
+  /* Identidad v2: movimiento (mismo sistema que la landing de EYWA) */
   @keyframes ey-blur-in { from { opacity: 0; filter: blur(10px); transform: translateY(10px); } to { opacity: 1; filter: blur(0); transform: none; } }
   @keyframes ey-fade-up { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
   @keyframes ey-pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
@@ -103,7 +103,7 @@
       .ey-reveal, .ey-reveal-blur, .ey-reveal-pop { animation: ey-fade linear both; animation-timeline: view(); animation-range: entry 0% entry 50%; }
     }
   }
-  /* Componentes animados (mismos que la landing de UNANCHA, en verde Agro) */
+  /* Componentes animados (mismos que la landing de EYWA, en verde Agro) */
   @property --fx-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
   @keyframes fx-spin { to { --fx-angle: 360deg; } }
   @keyframes fx-shine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
@@ -155,7 +155,7 @@
 
 <script>
 // ══ UNANCHA Agro — trazabilidad por organización ═══════════════════════════════════
-// Misma cuenta y API que UNANCHA. Todo dato pertenece a una ORGANIZACIÓN (cooperativa,
+// Misma cuenta y API que EYWA. Todo dato pertenece a una ORGANIZACIÓN (cooperativa,
 // asociación, agroindustria); la activa viaja en la cabecera X-Agro-Org.
 // Roles: admin (todo, incl. ventas/pagos y equipo) · tecnico (registra) · lector.
 // Los textos del servidor se insertan siempre escapados.
@@ -168,7 +168,7 @@ const URL_PLATAFORMA = 'https://eywa.encsust4in4ble.earth';
 // (sessionStorage) y había que volver a entrar en cada pestaña nueva.
 const leer = (k) => { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch { return null; } };
 const guardar = (k, v) => { try { sessionStorage.removeItem(k); v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
-// Entrada única: UNANCHA emite un código de un solo uso y vuelve aquí (/sso#c=…).
+// Entrada única: EYWA emite un código de un solo uso y vuelve aquí (/sso#c=…).
 const ENTRAR_CON_EYWA = URL_PLATAFORMA + '/ir-a-agro';
 // Si se cierra sesión en otra pestaña, esta también sale.
 window.addEventListener('storage', (e) => { if (e.key === 'agro_token' && !e.newValue && token) { token = null; org = null; orgs = []; render(); } });
@@ -333,7 +333,7 @@ function modal(titulo, campos, alEnviar) {
   d.showModal();
 }
 
-let eywaDisponibles = []; // organizaciones de UNANCHA de la persona que aún no están en Agro
+let eywaDisponibles = []; // organizaciones de EYWA de la persona que aún no están en Agro
 async function cargarOrgs() {
   const r = await api('/agro/organizaciones');
   orgs = r.organizaciones;
@@ -427,7 +427,7 @@ function landing(app) {
           <a href="#como" class="px-3 py-2 hover:text-gray-900">Cómo funciona</a>
           <a href="#pasaporte" class="px-3 py-2 hover:text-gray-900">Pasaporte</a>
           <a href="#eudr" class="px-3 py-2 hover:text-gray-900">EUDR</a>
-          <a href="${URL_PLATAFORMA}" class="px-3 py-2 hover:text-gray-900">← UNANCHA</a>
+          <a href="${URL_PLATAFORMA}" class="px-3 py-2 hover:text-gray-900">← EYWA</a>
         </div>
         <div class="flex items-center gap-2">
           <a href="/entrar" data-ir class="hidden sm:block px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Iniciar sesión</a>
@@ -548,10 +548,10 @@ function landing(app) {
     <section class="bg-green-50">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 py-24 flex flex-col items-center gap-5 text-center">
         <h2 class="ey-reveal-blur text-3xl md:text-4xl text-green-800">Lleva tu cooperativa <b>del lote al saco</b></h2>
-        <p class="text-gray-600">Crea tu organización con tu cuenta de UNANCHA y empieza a registrar a tus productores hoy.</p>
+        <p class="text-gray-600">Crea tu organización con tu cuenta de EYWA y empieza a registrar a tus productores hoy.</p>
         <div class="flex flex-col sm:flex-row gap-3">
           <a href="/entrar" data-ir class="ey-pill bg-green-800 text-white">Empezar ahora</a>
-          <a href="${URL_PLATAFORMA}" class="ey-pill border border-green-300 bg-white text-green-800 font-medium">Crear cuenta en UNANCHA</a>
+          <a href="${URL_PLATAFORMA}" class="ey-pill border border-green-300 bg-white text-green-800 font-medium">Crear cuenta en EYWA</a>
         </div>
       </div>
     </section>
@@ -595,7 +595,7 @@ function animarLanding(app) {
   medir();
 }
 
-// ── Login: el mismo de UNANCHA (misma cuenta, mismo diseño) ──
+// ── Login: el mismo de EYWA (misma cuenta, mismo diseño) ──
 const GUARDADO_SIN_RED = 'Sin conexión: quedó guardado en este teléfono y se enviará solo al volver la señal.';
 
 // ── Registros guardados sin conexión ──
@@ -622,7 +622,7 @@ function pendientesVista(app) {
   const e = $('#enviarTodo'); if (e) e.onclick = async () => { await sincronizar(true); pendientesVista(app); };
 }
 
-// ── Entrada única desde UNANCHA ──
+// ── Entrada única desde EYWA ──
 // Llega con #c=<código>&a=<ruta>. El código se canjea UNA vez por el token y se
 // borra de la barra de direcciones de inmediato.
 async function entradaUnica(app) {
@@ -631,7 +631,7 @@ async function entradaUnica(app) {
   const destino = /^\/(?!\/)[\w\-/]*$/.test(h.get('a') || '') ? h.get('a') : '/';
   history.replaceState({}, '', '/sso');
   $('#cab').style.display = 'none';
-  app.innerHTML = '<div class="min-h-[60vh] flex items-center justify-center gap-2 text-sm text-gray-500"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Entrando con tu cuenta de UNANCHA…</div>';
+  app.innerHTML = '<div class="min-h-[60vh] flex items-center justify-center gap-2 text-sm text-gray-500"><span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>Entrando con tu cuenta de EYWA…</div>';
   if (!codigo) { history.replaceState({}, '', '/entrar?sso=error'); return render(); }
   try {
     const d = await api('/auth/sso/canjear', { method: 'POST', body: { codigo } });
@@ -656,10 +656,10 @@ function login(app) {
           <div class="text-emerald-600 text-xs tracking-wider">ORQUESTACIÓN DE ECOSISTEMAS</div></div>
         </div>
         <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 mb-3">Bienvenido</h1>
-        <p class="text-gray-600 mb-6">Tu cuenta de UNANCHA es la misma. Si ya entraste en UNANCHA, no necesitas tu contraseña.</p>
-        <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde UNANCHA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
+        <p class="text-gray-600 mb-6">Tu cuenta de EYWA es la misma. Si ya entraste en EYWA, no necesitas tu contraseña.</p>
+        <div id="msg">${new URLSearchParams(location.search).get('sso') === 'error' ? aviso('No pudimos completar la entrada desde EYWA. Inténtalo de nuevo o usa tu correo y contraseña.') : ''}</div>
         <a href="${ENTRAR_CON_EYWA}" class="ey-pill w-full bg-green-800 text-white hover:bg-green-900 flex items-center justify-center gap-2 mb-6">
-          <img src="/logo.png?v=2" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de UNANCHA</a>
+          <img src="${URL_PLATAFORMA}/logo.png" alt="" class="w-5 h-5 object-contain bg-white rounded-full"> Continuar con mi cuenta de EYWA</a>
         <div class="flex items-center gap-3 text-xs text-gray-400 mb-6"><span class="flex-1 h-px bg-gray-200"></span>o con tu correo<span class="flex-1 h-px bg-gray-200"></span></div>
         <form id="f" class="space-y-5">
           <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</span>
@@ -669,7 +669,7 @@ function login(app) {
           <div class="text-right"><a href="${URL_PLATAFORMA}/recuperar" class="text-sm text-emerald-600 hover:text-emerald-700">¿Olvidaste tu contraseña?</a></div>
           <button class="ey-pill w-full bg-white border border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50" id="entrar">Iniciar sesión</button>
         </form>
-        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${URL_PLATAFORMA}" class="text-emerald-600 font-medium">Regístrate en UNANCHA</a></p>
+        <p class="mt-8 text-center text-sm text-gray-500">¿No tienes cuenta? <a href="${URL_PLATAFORMA}" class="text-emerald-600 font-medium">Regístrate en EYWA</a></p>
       </div>
     </div>
     <div class="hidden lg:block lg:w-1/2 relative">
@@ -704,7 +704,7 @@ function nuevaOrganizacion(app) {
     <div id="msg"></div>
     ${eywaDisponibles.length ? `
     <div class="card mb-4 !border-green-200 !bg-green-50/60">
-      <p class="font-semibold text-gray-900">Tus organizaciones de UNANCHA</p>
+      <p class="font-semibold text-gray-900">Tus organizaciones de EYWA</p>
       <p class="text-sm text-gray-600 mb-3">Úsala aquí con un clic: es la misma empresa en ambas plataformas, con tu misma cuenta.</p>
       <div class="space-y-2">
         ${eywaDisponibles.map((o) => `<div class="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 p-3">
@@ -784,7 +784,7 @@ async function panel(app) {
     </div>
   </section>
   ${eywaDisponibles.length ? `<div class="card mb-5 flex flex-wrap items-center gap-3 !border-green-200 !bg-green-50/60 text-sm">
-    <span class="flex-1 min-w-[14rem]">Tienes ${eywaDisponibles.length === 1 ? `<b>${esc(eywaDisponibles[0].nombre)}</b>` : `<b>${eywaDisponibles.length} organizaciones</b>`} en UNANCHA que aún no usas en Agro.</span>
+    <span class="flex-1 min-w-[14rem]">Tienes ${eywaDisponibles.length === 1 ? `<b>${esc(eywaDisponibles[0].nombre)}</b>` : `<b>${eywaDisponibles.length} organizaciones</b>`} en EYWA que aún no usas en Agro.</span>
     <a data-ir href="/organizaciones" class="btn2">Usarla en Agro</a></div>` : ''}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
     ${kpi('Productores', num(r.productores))}
@@ -813,7 +813,7 @@ async function panel(app) {
     <p class="text-xs text-gray-400 mt-3">La "no deforestación" es una declaración del productor con fecha; aún no hay verificación satelital.</p>
   </div>
   <div class="card mt-4 text-sm">
-    <p class="font-medium text-gray-800 mb-2">Con tu misma cuenta, en UNANCHA</p>
+    <p class="font-medium text-gray-800 mb-2">Con tu misma cuenta, en EYWA</p>
     <div class="flex flex-wrap gap-2">
       <a class="btn2" href="${URL_PLATAFORMA}/?vista=diagnostico" target="_blank" rel="noopener">Diagnóstico GENES de tu organización</a>
       <a class="btn2" href="${URL_PLATAFORMA}/?vista=dataroom" target="_blank" rel="noopener">Dataroom</a>
@@ -972,10 +972,10 @@ async function equipo(app, msg = '') {
   <div class="grid lg:grid-cols-3 gap-4">
     ${puede.admin() ? `<form id="f" class="card space-y-3 h-fit">
       <div class="font-medium">Sumar a alguien</div>
-      <input class="inp" name="email" type="email" placeholder="Correo de su cuenta de UNANCHA" required>
+      <input class="inp" name="email" type="email" placeholder="Correo de su cuenta de EYWA" required>
       <select class="inp" name="rol">${opcionesRol('tecnico')}</select>
       <button class="btn w-full">Agregar</button>
-      <p class="text-[11px] text-gray-400">Necesita una cuenta de UNANCHA (es la misma para agro). Si no la tiene, que se registre en eywa.encsust4in4ble.earth.</p>
+      <p class="text-[11px] text-gray-400">Necesita una cuenta de EYWA (es la misma para agro). Si no la tiene, que se registre en eywa.encsust4in4ble.earth.</p>
     </form>` : ''}
     <div class="card rt-wrap ${puede.admin() ? 'lg:col-span-2' : 'lg:col-span-3'}">
       ${tabla(['Persona', 'Rol', ''], miembros.map((m) => [
@@ -1069,17 +1069,17 @@ function importar(app) {
   }
 }
 
-// ══ Módulos reciclados de UNANCHA (misma API, misma cuenta) ═══════════════════════
+// ══ Módulos reciclados de EYWA (misma API, misma cuenta) ═══════════════════════
 async function fondos(app) {
   const r = await fetch('/api/funds', { headers: { Authorization: 'Bearer ' + token } });
-  if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-semibold tracking-tight mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de UNANCHA.', 'ok'); return; }
+  if (r.status === 403) { app.innerHTML = '<h1 class="text-2xl font-semibold tracking-tight mb-5">Fondos</h1>' + aviso('El catálogo de fondos es parte del Plan Premium de EYWA.', 'ok'); return; }
   const d = await r.json();
   const todos = d.funds || [];
   const agro = todos.filter((f) => (f.sector_tags || []).some((t) => ['agro', 'ambiente', 'clima', 'circular'].includes(t)));
   const vig = (f) => !f.deadline || new Date(f.deadline) > new Date();
   app.innerHTML = `
   <h1 class="text-2xl font-semibold tracking-tight mb-1">Fondos para agro</h1>
-  <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de UNANCHA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
+  <p class="text-sm text-gray-500 mb-5">${agro.length} de ${todos.length} fondos del catálogo de EYWA (agro, ambiente, clima y economía circular). Se verifican automáticamente cada noche.</p>
   <div class="card rt-wrap">${tabla(['Fondo', 'Instrumento', 'Monto', 'Cierre'], agro.sort((a, b) => vig(b) - vig(a)).map((f) => [
     `${f.url ? `<a class="text-emerald-700 underline" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}
       <div class="text-xs text-gray-400">${esc(f.scope)}${f.verify_status === 'enlace_roto' ? ' · enlace por verificar' : ''}</div>`,
@@ -1093,7 +1093,7 @@ async function actores(app) {
   const d = await api('/public/v1/actores?por_pagina=100&q=' + encodeURIComponent(q));
   app.innerHTML = `
   <h1 class="text-2xl font-semibold tracking-tight mb-1">Actores del ecosistema</h1>
-  <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de UNANCHA).</p>
+  <p class="text-sm text-gray-500 mb-4">${d.total} financiadores, intermediarios y entidades de Perú y Colombia (directorio de EYWA).</p>
   <form id="fq" class="mb-4 flex gap-2"><input class="inp" name="q" placeholder="Buscar: cacao, agro, café, cooperativa…" value="${esc(q)}"><button class="btn shrink-0">Buscar</button></form>
   <div class="grid md:grid-cols-2 gap-3">${d.actores.map((a) => `<div class="card !p-4">
     <div class="font-medium">${a.web ? `<a class="hover:text-emerald-700" href="${esc(a.web.startsWith('http') ? a.web : 'https://' + a.web)}" target="_blank" rel="noopener">${esc(a.nombre)}</a>` : esc(a.nombre)}</div>

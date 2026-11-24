@@ -106,7 +106,7 @@ export class DataroomRepository {
     ]);
     const wanted: { name: string; note: string }[] = [];
     if (diag) wanted.push({ name: 'Reporte de sostenibilidad', note: 'Diagnóstico ESG (metodología GENES) realizado en la plataforma' });
-    if (certs > 0) wanted.push({ name: 'Certificaciones de calidad / sostenibilidad', note: `${certs} certificado(s) de la Academia UNANCHA` });
+    if (certs > 0) wanted.push({ name: 'Certificaciones de calidad / sostenibilidad', note: `${certs} certificado(s) de la Academia EYWA` });
     if (!wanted.length) return new Map();
 
     const items = await this.db.dataroomItem.findMany({
